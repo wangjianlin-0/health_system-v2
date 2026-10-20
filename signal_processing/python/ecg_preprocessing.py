@@ -6,8 +6,20 @@ import math
 def parse_csv(text, sample_rate_hz):
     rows = list(csv.reader(io.StringIO(text)))
     values = []
+    hardware_header = None
     for index, row in enumerate(rows):
         if not row or not row[0].strip():
+            continue
+        normalized = [cell.strip().lower() for cell in row]
+        if index == 0 and 'ecg_filtered' in normalized:
+            hardware_header = normalized
+            continue
+        if hardware_header is not None:
+            column_index = hardware_header.index('ecg_filtered')
+            try:
+                values.append(float(row[column_index]))
+            except (IndexError, ValueError) as exc:
+                raise ValueError('ecg_filtered 必须为数值') from exc
             continue
         if len(row) != 1:
             raise ValueError('CSV 必须为单列信号，不能把时间列当幅值')
@@ -17,7 +29,13 @@ def parse_csv(text, sample_rate_hz):
             if index == 0 and row[0].strip().lower() in ('value', 'sample', 'mv'):
                 continue
             raise ValueError('CSV 仅支持单列数值，可含 value/sample/mv 表头')
-    return {'samples': values, 'sample_rate_hz': sample_rate_hz, 'unit': 'mV', 'lead': 'user_single_lead', 'source': 'csv_import'}
+    return {
+        'samples': values,
+        'sample_rate_hz': sample_rate_hz,
+        'unit': 'mV',
+        'lead': 'user_single_lead',
+        'source': 'hardware_csv' if hardware_header else 'csv_import',
+    }
 
 def process(signal):
     values = signal.get('samples', [])
