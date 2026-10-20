@@ -7,6 +7,10 @@ import os
 from typing import Any
 from urllib import request
 
+from ai_model.config import load_project_env
+
+load_project_env()
+
 
 EXPLANATION_SYSTEM_PROMPT = """你是“未卜心知”的心电辅助说明助手。
 你的表达要像一位温和、耐心、专业的家庭健康顾问：先让不懂医学的老年人听明白，再补充必要的专业依据。
@@ -23,6 +27,9 @@ EXPLANATION_SYSTEM_PROMPT = """你是“未卜心知”的心电辅助说明助�
 5. other_abnormality 只能说“存在其他异常节律可能”，不能猜测具体疾病。
 6. too_noisy、信号质量不足、模型未完成或 unknown 时，必须先说明无法可靠判断，并指导重新测量。
 7. 所有专业术语后面立即用通俗话解释，例如“窦性节律（心跳节奏总体规则）”。
+   但 elderly_summary 字段禁止出现专业术语，只能使用老人日常能听懂的说法。
+   elderly_summary 不得出现“单导联、窦性节律、RR、室性早搏、分类器、模型、
+   信噪比、心电图”等术语；改成“这次测量”“心跳节奏”“两次心跳之间的间隔”等说法。
 8. evidence 只能引用输入中的事实；不要编造数值，不要把推测写成事实。
 9. confidence 较低、存在冲突标记或模型异常时，要明确说明不确定。
 10. 建议只能包括保持安静、重新贴好电极、重新测量、保存记录、咨询专业人员等。
@@ -70,12 +77,48 @@ def _common_fields(labels: list[str], limitations: list[str]) -> dict[str, Any]:
     }
 
 
+def _plain_summary_is_safe(summary: Any) -> bool:
+    if not isinstance(summary, str) or not summary.strip():
+        return False
+    forbidden_terms = (
+        '单导联',
+        '窦性节律',
+        'RR',
+        '室性早搏',
+        '分类器',
+        '模型',
+        '信噪比',
+        '心电图',
+    )
+    return len(summary) <= 120 and not any(term in summary for term in forbidden_terms)
+
+
 def _template(payload: dict[str, Any]) -> dict[str, Any]:
     classification = payload['classification'].get('label')
     concepts = payload.get('concepts', [])
     labels = [item['label'] for item in concepts]
     quality = payload.get('quality', {})
     limitations = payload.get('limitations', [])
+    decision = payload.get('decision') or {}
+    coach = payload.get('measurement_coach') or {}
+    coach_actions = coach.get('actions') or []
+    measurements = payload.get('measurements') or {}
+    heart_rate = measurements.get('heart_rate') or {}
+    bpm = heart_rate.get('bpm')
+    bpm_text = f'{bpm:g}' if isinstance(bpm, (int, float)) and bpm > 0 else '没有可靠数值'
+    if decision.get('state') == 'model_uncertain':
+        result = {
+            'summary': '这次结果还不够确定，先不用紧张，建议按提示调整后重新测量。',
+            'elderly_summary': '这次信号里有一些干扰，或者模型把握不够大，所以不能把结果当成可靠判断。请先调整姿势和电极，再测一次。',
+            'professional_interpretation': '当前结果进入模型不确定状态，暂不展示确定性的节律分类；需要结合更清晰的复测结果复核。',
+            'risk_level': 'repeat_measurement',
+            'advice': '请按照测量指导调整后重新采集，必要时由专业人员复核。',
+            'reassurance': '模型不确定不等于身体一定有问题，先把信号录清楚更重要。',
+            'next_steps': coach_actions[:3] or ['安静休息后重新测量。', '保存本次记录供后续对比。'],
+            'measurement_guidance': coach_actions[:3] or ['测量时保持安静和不动。'],
+        }
+        result.update(_common_fields(labels, limitations))
+        return result
     if quality.get('status') == 'insufficient' or classification == 'too_noisy':
         result = {
             'summary': '这次记录的信号不够清楚，先不用紧张，但现在还不能可靠判断心跳情况。',
@@ -84,8 +127,8 @@ def _template(payload: dict[str, Any]) -> dict[str, Any]:
             'risk_level': 'repeat_measurement',
             'advice': '请保持安静并重新采集，必要时由专业人员复核。',
             'reassurance': '一次测量不清楚很常见，先调整姿势和电极，再测一次即可。',
-            'next_steps': ['先坐下休息约1分钟。', '确认电极贴紧皮肤，测量时不要说话或移动。', '重新记录一段完整心电。'],
-            'measurement_guidance': ['手臂放松并保持不动。', '电极接触处保持清洁、干燥、贴合。'],
+            'next_steps': coach_actions[:3] or ['先坐下休息约1分钟。', '确认电极贴紧皮肤，测量时不要说话或移动。', '重新记录一段完整心电。'],
+            'measurement_guidance': coach_actions[:3] or ['手臂放松并保持不动。', '电极接触处保持清洁、干燥、贴合。'],
         }
         result.update(_common_fields(labels, limitations))
         return result
@@ -93,8 +136,8 @@ def _template(payload: dict[str, Any]) -> dict[str, Any]:
     heart_rate_text = _heart_rate_text(payload)
     if classification == 'normal':
         result = {
-            'summary': f'这次记录看起来比较平稳，{heart_rate_text}。先不用过度紧张。',
-            'elderly_summary': f'从这次记录看，心跳节奏总体比较规则，{heart_rate_text}。目前没有看到需要立刻处理的明显提示。',
+            'summary': f'这次测量看起来比较平稳，{heart_rate_text}。先不用过度紧张。',
+            'elderly_summary': f'这次测量看起来比较平稳，心跳大约每分钟 {bpm_text} 下。先不用紧张；如果您身体不舒服，请告诉家人并及时就医。',
             'professional_interpretation': '分类器将本次记录标记为正常窦性节律，也就是心跳节奏总体由心脏正常起搏点带动。',
             'risk_level': 'reference_only',
             'advice': '建议保存记录，继续留意自己的身体感受；如有不舒服，请咨询专业人员。',
@@ -172,12 +215,15 @@ def _llm(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def generate_explanation(payload: dict[str, Any]) -> dict[str, Any]:
+    load_project_env()
     if os.environ.get('ECG_EXPLANATION_PROVIDER') in ('openai_compatible', 'deepseek'):
         try:
             result = _llm(payload)
             template = _template(payload)
             for key, value in template.items():
                 result.setdefault(key, value)
+            if not _plain_summary_is_safe(result.get('elderly_summary')):
+                result['elderly_summary'] = template['elderly_summary']
             result['diagnosis_status'] = 'not_a_diagnosis'
             result['provider'] = os.environ.get('ECG_EXPLANATION_PROVIDER')
             result['api_called'] = True

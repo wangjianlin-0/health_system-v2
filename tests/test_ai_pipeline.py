@@ -66,3 +66,50 @@ def test_deepseek_defaults(monkeypatch):
     assert '"model": "deepseek-chat"' in captured['body']
     assert result['provider'] == 'template'
     assert result['api_called'] is False
+
+
+def test_llm_technical_elderly_summary_is_replaced(monkeypatch):
+    import ai_model.explanation.generator as generator
+
+    monkeypatch.setenv('ECG_EXPLANATION_PROVIDER', 'deepseek')
+    monkeypatch.setenv('DEEPSEEK_API_KEY', 'test-key')
+
+    class FakeResponse:
+        def read(self):
+            import json
+            return json.dumps({
+                'choices': [{
+                    'message': {
+                        'content': json.dumps({
+                            'elderly_summary': '本次单导联短时记录呈正常窦性节律特征，RR间期规则，未见室性早搏。',
+                            'professional_interpretation': '专业解释',
+                            'evidence': [],
+                            'uncertainty': ['单导联短时记录'],
+                            'reassurance': '请放心',
+                            'next_steps': [],
+                            'measurement_guidance': [],
+                            'urgent_warning': '出现不适及时就医',
+                            'risk_level': 'reference_only',
+                            'diagnosis_status': 'not_a_diagnosis',
+                        })
+                    }
+                }]
+            }).encode('utf-8')
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(generator.request, 'urlopen', lambda request, timeout: FakeResponse())
+    result = generator.generate_explanation({
+        'classification': {'label': 'normal'},
+        'concepts': [{'label': 'RR 间期相对规则'}],
+        'measurements': {'heart_rate': {'bpm': 77}},
+        'quality': {'status': 'basic_checks_passed'},
+    })
+    assert result['api_called'] is True
+    assert '单导联' not in result['elderly_summary']
+    assert '窦性节律' not in result['elderly_summary']
+    assert 'RR' not in result['elderly_summary']

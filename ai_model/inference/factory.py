@@ -2,6 +2,11 @@
 import os
 from typing import Protocol
 
+from ai_model.config import load_project_env
+
+load_project_env()
+
+
 class Classifier(Protocol):
     def predict(self, processed: dict) -> dict: ...
 
