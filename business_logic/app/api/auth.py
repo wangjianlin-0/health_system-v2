@@ -27,3 +27,7 @@ def login(body: Credentials):
 @router.post('/logout')
 def logout(user: str = Depends(current_user), credentials=Depends(bearer)):
     return family.logout(credentials.credentials)
+
+@router.get('/session')
+def session(user: str = Depends(current_user), credentials=Depends(bearer)):
+    return family.session_info(credentials.credentials)

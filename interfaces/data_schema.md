@@ -8,4 +8,4 @@
 
 Record：id、created_at（UTC ISO）、task_status、result。当前同步执行，completed 代表流水线结束，不表示模型已有输出。后续模型还需标签版本、配置、输入来源追溯和窗口位置。
 
-用户/会话/记录/授权/通知表由 `business_logic/app/services/storage.py` 初始化。记录 owner_id 与会话 user_id 关联；共享查询必须匹配有效授权。撤回限制后续查询，不能抹除已被查看或下载的副本。
+用户/会话/记录/授权/通知表由 `business_logic/app/services/storage.py` 初始化。会话记录服务端过期时间；过期或退出后令牌失效。家庭邀请状态为 pending、accepted、declined 或 revoked，只有 accepted 且 active 的授权生效。权限包含 `records:list` 和 `records:read`；后者自动包含前者。记录 owner_id 与会话 user_id 关联，共享列表和详情分别核验对应权限。撤回限制后续查询，不能抹除已被查看或下载的副本。通知保留历史并记录 unread、read、dismissed 状态。

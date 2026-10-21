@@ -15,14 +15,29 @@ def create(user, signal):
 def list_records(user, shared=False):
     with connect() as db:
         if shared:
-            rows = db.execute('SELECT DISTINCT r.id,r.created_at,r.owner_id FROM records r JOIN grants g ON g.owner_id=r.owner_id WHERE g.relative_id=? AND g.active=1 ORDER BY r.created_at DESC', (user,))
+            rows = db.execute('''
+                SELECT DISTINCT r.id,r.created_at,r.owner_id FROM records r
+                JOIN grants g ON g.owner_id=r.owner_id
+                WHERE g.relative_id=? AND g.active=1 AND g.status='accepted'
+                  AND (',' || g.permissions || ',') LIKE '%,records:list,%'
+                ORDER BY r.created_at DESC
+            ''', (user,))
         else:
             rows = db.execute('SELECT id,created_at FROM records WHERE owner_id=? ORDER BY created_at DESC', (user,))
         return [dict(r) for r in rows]
 
 def detail(user, identifier):
     with connect() as db:
-        row = db.execute('SELECT * FROM records WHERE id=? AND (owner_id=? OR EXISTS (SELECT 1 FROM grants g WHERE g.owner_id=records.owner_id AND g.relative_id=? AND g.active=1))', (identifier,user,user)).fetchone()
+        row = db.execute('''
+            SELECT * FROM records WHERE id=? AND (
+                owner_id=? OR EXISTS (
+                    SELECT 1 FROM grants g
+                    WHERE g.owner_id=records.owner_id AND g.relative_id=?
+                      AND g.active=1 AND g.status='accepted'
+                      AND (',' || g.permissions || ',') LIKE '%,records:read,%'
+                )
+            )
+        ''', (identifier,user,user)).fetchone()
     if not row:
         raise LookupError('记录不存在或没有查看权限')
     return json.loads(row['payload'])
