@@ -1,3 +1,5 @@
 # Optional real ECG classification; base CI does not download models.
 -r business_logic/requirements.txt
 openecg[report]==0.11.0
+neurokit2==0.2.13
+wfdb>=4.1,<5

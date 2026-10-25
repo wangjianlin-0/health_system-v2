@@ -57,7 +57,11 @@ def build_concepts(prediction: dict[str, Any], quality: dict[str, Any]) -> list[
     return concepts
 
 
-def build_evidence_payload(prediction: dict[str, Any], quality: dict[str, Any]) -> dict[str, Any]:
+def build_evidence_payload(
+    prediction: dict[str, Any],
+    quality: dict[str, Any],
+    measurement_coach: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return {
         'classification': {
             'label': prediction.get('label'),
@@ -74,5 +78,7 @@ def build_evidence_payload(prediction: dict[str, Any], quality: dict[str, Any]) 
             'flags': prediction.get('flags', []),
         },
         'quality': quality,
+        'decision': prediction.get('decision'),
+        'measurement_coach': measurement_coach,
         'limitations': ['单导联短时记录', '仅用于辅助分析，不替代临床诊断'],
     }

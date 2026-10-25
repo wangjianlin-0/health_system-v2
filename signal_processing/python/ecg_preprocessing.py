@@ -3,6 +3,12 @@ import csv
 import io
 import math
 
+
+ADS1292R_VREF_MV = 2420.0
+ADS1292R_PGA_GAIN = 6.0
+ADS1292R_CODE_SCALE = 2 ** 23
+
+
 def parse_csv(text, sample_rate_hz):
     rows = list(csv.reader(io.StringIO(text)))
     values = []
@@ -21,9 +27,13 @@ def parse_csv(text, sample_rate_hz):
             if len(row) <= hardware_column:
                 raise ValueError('硬件 CSV 缺少 ecg_filtered 列值')
             try:
-                values.append(float(row[hardware_column]))
+                filtered_adc_count = float(row[hardware_column])
             except ValueError:
                 raise ValueError('硬件 CSV 的 ecg_filtered 列必须为数值')
+            values.append(
+                filtered_adc_count * ADS1292R_VREF_MV
+                / (ADS1292R_PGA_GAIN * ADS1292R_CODE_SCALE)
+            )
             continue
         if len(row) != 1:
             raise ValueError('CSV 必须为单列信号，不能把时间列当幅值')
@@ -33,7 +43,24 @@ def parse_csv(text, sample_rate_hz):
             if index == 0 and row[0].strip().lower() in ('value', 'sample', 'mv'):
                 continue
             raise ValueError('CSV 仅支持单列数值，可含 value/sample/mv 表头')
-    return {'samples': values, 'sample_rate_hz': sample_rate_hz, 'unit': 'mV', 'lead': 'hardware_filtered' if hardware_column is not None else 'user_single_lead', 'source': 'hardware_csv' if hardware_column is not None else 'csv_import'}
+    result = {
+        'samples': values,
+        'sample_rate_hz': sample_rate_hz,
+        'unit': 'mV',
+        'lead': 'hardware_filtered' if hardware_column is not None else 'user_single_lead',
+        'source': 'hardware_csv' if hardware_column is not None else 'csv_import',
+    }
+    if hardware_column is not None:
+        result['input_unit'] = 'adc_count'
+        result['calibration'] = {
+            'vref_mv': ADS1292R_VREF_MV,
+            'pga_gain': ADS1292R_PGA_GAIN,
+            'code_scale': ADS1292R_CODE_SCALE,
+            'applied_to': 'ecg_filtered',
+            'formula': 'mV = adc_count * vref_mv / (pga_gain * 2^23)',
+            'raw_offset_removed': False,
+        }
+    return result
 
 def process(signal):
     values = signal.get('samples', [])

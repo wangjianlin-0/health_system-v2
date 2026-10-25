@@ -30,9 +30,77 @@ cd frontend
 npm run build
 ```
 
+## AI 分析流程与硬件输入
+
+唐一可负责的 AI 流程由统一入口 `ai_model/pipeline.py` 串联：
+
+```text
+ADS1292R 波形 CSV
+→ 读取 ecg_filtered 列
+→ 基础有效性检查
+→ 本地信号质量评估
+→ NeuroKit2 外部质量评估（已安装时）
+→ 测量质量教练
+→ OpenECG 分类
+→ 三态结果决策
+→ 可追溯 ECG 概念证据
+→ DeepSeek 或本地模板解释
+→ 保存并由前端展示
+```
+
+当前支持的 ADS1292R 波形文件应包含逐采样数据，例如：
+
+```csv
+timestamp(s),resp_raw,ecg_raw,resp_filtered,ecg_filtered
+0.000,8806366,8925108,291826.1,-1937.7
+0.002,8806351,8924897,290978.1,-1780.5
+```
+
+上传时采样率填写实际值，当前 OpenECG 适配器要求单导联 `500 Hz`、至少 `10 秒`，并使用前 `10 秒` 分析。解析器优先读取 `ecg_filtered`，不会把 `ECGHeatData` 中的心率、呼吸率、RR、QRS、QT 等设备计算指标当作模型输入。硬件 `ecg_filtered` 按 ADC 计数换算为 mV，使用 `VREF=2.42 V`、`PGA=6`：`mV = count × 2420 / (6 × 2^23)`；该列视为已经零中心滤波，不再减偏移码 `8388608`。原始 `ecg_raw` 不参与当前模型输入。若固件寄存器配置与此不同，需同步更新换算参数。普通单列 CSV 不做 ADC 换算。
+
+质量评估输出运动干扰、基线漂移、疑似工频干扰、信噪比代理值和平直信号等工程指标，并生成坐稳、贴紧电极、远离电器等复测动作。质量不足时跳过分类；分类结果还会经过 `signal_invalid`、`model_uncertain`、`assistive_classification` 三态决策，不能展示为确定性医疗诊断。
+
+解释输出包括通俗说明、专业解读、分析依据、限制、不确定性、安抚说明、测量指导、下一步建议和紧急症状提醒。解释结果中还会标记 `provider`、`api_called` 和 `fallback_reason`，用于确认是否实际调用远程大模型。
+
+## AI 依赖、模型与配置
+
+`requirements-dev.txt` 已包含测试、OpenECG 和 NeuroKit2，安装全部开发依赖即可：
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+```
+
+也可以只安装真实 ECG 模型相关依赖：
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements-ai.txt
+```
+
+真实 OpenECG 分类需要在项目根目录 `.env` 中设置：
+
+```dotenv
+ECG_MODEL_TYPE=openecg
+```
+
+NeuroKit2 暂时默认禁用，质量评估只使用项目本地规则；需要重新启用外部质量评估时设置：
+
+```dotenv
+ECG_QUALITY_PROVIDER=neurokit2
+```
+
+需要使用 DeepSeek 解释时配置：
+
+```dotenv
+ECG_EXPLANATION_PROVIDER=deepseek
+ECG_LLM_MODEL=deepseek-chat
+DEEPSEEK_API_KEY=你的密钥
+```
+
+解释 API 调用失败会自动回退到本地模板。`.env` 和真实 API Key 不得提交到 Git。
+
 ## 可选 OpenECG 安装与公开测试数据
 
-基础依赖只运行网站框架和测试；需要真实 OpenECG 分类时，另外使用项目虚拟环境安装 requirements-ai.txt。该文件固定已完成本机联调的 openecg[report]==0.11.0，模型依赖和权重不上传 Git。
+`requirements-ai.txt` 固定已完成本机联调的 `openecg[report]==0.11.0` 和 `neurokit2==0.2.13`，模型依赖和权重不上传 Git。
 
 Windows PowerShell（仓库根目录）：
 
@@ -47,7 +115,7 @@ Windows PowerShell（仓库根目录）：
 
 已提供 csv/ptbxl_00001_lead_II_500Hz_10s.csv：PTB-XL 公开记录的 II 导联，5000 点、500 Hz、10 秒。导入时采样率填 500，来源、转换说明及 CC BY 4.0 许可见 [样本说明](csv/README.md)。旧记录不会自动重新分析；安装或调整模型后需要重启后端并创建新记录。
 
-外部解释模块目前读取进程环境变量，单独在 .env 填写 DeepSeek 变量不会启用远程解释。没有显式启用时使用本地模板；API Key 不提交 Git。OpenECG 分类成功与外部大模型解释是两项独立功能。
+没有显式设置 `ECG_EXPLANATION_PROVIDER=deepseek` 或 `openai_compatible` 时使用本地模板。OpenECG 分类成功与外部大模型解释是两项独立功能。
 
 ## 目录与提交边界
 
@@ -56,8 +124,8 @@ Windows PowerShell（仓库根目录）：
 | tests/ | pytest 配置及全部自动测试；CI 执行 python -m pytest tests -q |
 | csv/ | 公开联调 CSV、来源 JSON 和许可；不存放测试 Python 脚本 |
 | runtime/ | 本机数据库、任务、上传和运行产物，不提交 |
-| requirements-dev.txt | 基础后端与自动测试依赖 |
-| requirements-ai.txt | 可选真实 ECG 模型依赖 |
+| requirements-dev.txt | 后端、自动测试、OpenECG 与 NeuroKit2 依赖 |
+| requirements-ai.txt | OpenECG 与 NeuroKit2 的 AI 依赖 |
 | .env.example | 可提交的配置模板；实际 .env、密钥不提交 |
 
 .venv、.venv-tasks、node_modules、构建产物、模型权重和缓存均不提交。csv/ 只允许已注明来源的公开样本进入版本管理；其他本地数据保留在电脑上。自动测试强制使用 none 分类器和本地解释模板，不依赖个人 .env、下载的模型或外部 API。
@@ -90,7 +158,7 @@ flowchart LR
 ## 已接通与待开发
 
 - 已接通：账号注册/登录/退出、受保护 API、CSV/合成输入、基础有效性检查、波形、SQLite 记录保存与详情、家属直接授权及撤回、站内授权提示。
-- 基础质量仅检查长度、有限数值与平直，不表示已完成噪声检测。默认框架模式不生成心率；可选 OpenECG 路径能产生分类与心率，但不等于已完成自研信号算法或模型性能评价。
+- 已接通本地工程质量筛查和可选 NeuroKit2 外部质量证据；质量结果不代表临床可用性。默认分类器为 none，不生成心率；配置 OpenECG 后可产生分类、心率和心拍指标，但不等于已完成自研信号算法或模型性能评价。
 - 未接模型返回 `model_unavailable`，质量不足返回 `skipped_quality`；分类与置信字段为空，不输出模拟“正常”。WebSocket 未就绪时拒绝连接，不返回固定心率。
 - 当前上传/回放返回 HTTP 202 和任务编号，由后台执行，状态通过 `/api/v1/tasks/{id}` 查询；`task_status=completed` 表示流水线结束，不代表已产生 AI 分类。任务状态和输入已持久化；重启后未完成任务标为 failed 并提示重新提交。历史分页、记录趋势汇总、本人 CSV/JSON 导出和删除已实现；邀请确认及外部健康警报仍待开发。
 - 单导联心拍任务优先；原 ECGFounder 12 导联清单是扩展参考，不是当前已加载模型。
