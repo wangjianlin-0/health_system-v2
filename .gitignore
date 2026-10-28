@@ -29,6 +29,12 @@ frontend/dist/
 *.ckpt
 .cache/
 
+# Local test sandboxes (Windows file permissions may block cleanup)
+.ecg-test-*/
+_pytest_tmp/
+tests/.tmp/*
+!tests/.tmp/.gitkeep
+
 # Only publish the documented public ECG fixture
 /csv/**
 !/csv/README.md

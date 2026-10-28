@@ -8,6 +8,10 @@
 - [链路概览](architecture/overview.md)
 - [五人分工与交接](team_assignment.md)
 
+## 方案
+
+- [记录与分析使用流程完善方案（王书阁）](plan/wangshuge-analyze-records-plan.md)
+
 ## 时间线
 
 - [时间线](timeline.md)
@@ -23,9 +27,11 @@
 ## 其他
 
 - [启动指南](GETTING_STARTED.md)
+- [运维与备份](operations.md)
 - [风险登记](risk_register.md)
 - [接口目录](../interfaces/README.md)
 
 ## 更新记录
 
 2026-10-21：统一入口、分工与实际状态。
+2026-10-28：新增记录与分析完善方案；P0–P2 实施完成：迁移、任务、筛选、趋势、健康检查、波形外置、原件、重分析、备注、审计、备份与波形缩放。

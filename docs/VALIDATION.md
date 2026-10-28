@@ -63,3 +63,58 @@
 - 可选模型依赖固定 openecg[report]==0.11.0；虚拟环境、权重、缓存、账号数据库、真实密钥不上传。
 - 发布 PTB-XL v1.0.3 公开 II 导联 CSV、来源 JSON 和 CC BY 4.0 许可：500 Hz、5000 点、10 秒，无重采样或重复信号。该样本已完成网站 API 联调；不表示模型临床性能已验收。
 - 旧版审查记录保留当时日期与边界；本节是后续更新。外部解释仍默认本地模板，真实硬件单位与模型未知标签映射等待验收事项不在本次整理范围内。
+
+## 记录与分析 P0（2026-10-28）
+
+按[记录与分析完善方案](plan/wangshuge-analyze-records-plan.md)实施 P0：
+
+- 数据库：新增 `schema_migrations` 与 0001–0003 迁移；`records` 增加摘要列、索引并用 JSON1 回填；`analysis_tasks` 增加 stage/heartbeat/error_code/幂等键等字段与 `task_events`；连接启用 WAL 与 `busy_timeout`。
+- 任务：进程内单 worker 队列替换 BackgroundTasks；原子认领、心跳与租约、取消（pending 立即取消，running 协作取消）、幂等键、启动恢复（pending 重新入队，running 超时标 interrupted）。
+- 接口：新增 `GET /tasks`、`POST /tasks/{id}/cancel`；`/records` 支持筛选/排序并返回摘要字段；`/records/trends` 支持 `timezone`、零填充与 summary；错误体新增 `code`/`request_id`；`/health` 报告迁移版本、队列与能力上限。
+- 页面：Analyze 拆为上传/任务进度/详情组件，加入本地预检、上传进度、退避轮询、取消与元数据表；Records 支持筛选进 URL、汇总卡、SVG 趋势图与共享只读标识；Dashboard 加入进行中任务与最近记录；波形改为按桶保留极值的降采样。
+
+验证：
+
+- 后端 `python -m pytest tests -q -p no:cacheprovider`：33 项通过（上一轮 14 项，本轮新增 19 项，覆盖迁移回填与校验、任务列表/取消/恢复/幂等、筛选与趋势时区、健康检查、错误体、多 worker 守卫）。
+- 前端 `npm run build`：TypeScript 与 Vite 生产构建通过（45 个模块）。本机在 DSH 沙箱下 Vite 读取配置触发 `spawn EPERM`，按工具约束对同一条构建命令申请一次更宽权限后完成，未修改构建配置。
+- 本机缺少 tzdata，`Asia/Shanghai` 使用固定 +08:00 兜底并通过边界用例；`business_logic/requirements.txt` 已加入 tzdata（dev 通过 `-r` 继承），装齐后走真实时区库。
+- 测试临时目录：沙箱拒绝 pytest 默认临时根，`tests/conftest.py` 改用 `tests/.tmp/<uuid>`（已加入 .gitignore）。
+
+未验证：真实浏览器人工验收、真实设备与模型、多进程部署；重分析、原始文件、波形窗口、备注与访问审计属于 P1，尚未实现。当前仍为单进程任务队列，不要配置多 worker。
+
+## 记录与分析 P1（2026-10-28）
+
+- 迁移 0004：新增 `record_signals`，把历史记录 payload 中的 waveform 转成 zlib + float32 外置，payload 只保留结果；读取时由 `detail` 解压重组，接口形状不变。迁移 0005：任务 `input_path` 与 `record_access_log`。
+- 接口：`GET /records/{id}/waveform`（时间窗、envelope/mean、100–8000 点）、`GET /records/{id}/raw`、`POST /records/{id}/reanalyze`、`PATCH /records/{id}` 备注、`export?format=raw`；详情新增 `has_raw_file`，删除级联波形与原件，访问动作写审计。
+- 页面：详情页加入下载原件、重新分析、备注编辑与重分析来源链接；原件/备注仅本人可操作，共享视图只读。
+
+验证：
+
+- 后端 38 项通过（P0 的 33 项 + 5 项 P1：波形窗口/共享权限、原件下载、重分析链、备注权限、审计与删除级联）。
+- 前端 `npm run build` 通过（45 个模块，dist JS 200.9 KB）。
+- 真实库升级到 schema v5：16 条记录、16 条波形行；payload 合计约 30 KB，外置压缩波形约 185 KB；详情解压出 2500 点，窗口接口 1 秒返回 167 点。
+- 测试上传目录已隔离到临时目录，避免在 `runtime/uploads` 残留测试文件。
+
+未验证：浏览器人工验收；波形窗口的前端缩放/拖动交互（接口已就绪，UI 仍用本地降采样）；审计查询接口；P2 的软删除、备份恢复、样例下载。真实设备、模型效果与多进程仍未验收。
+
+## 记录与分析 P2（2026-10-28）
+
+- 任务事件：`GET /tasks/{id}?include_events=1` 返回 pending/running/failed 等事件与错误码；不传参数保持旧响应。
+- 审计查询：`GET /records/{id}/access-log` 仅本人可查，支持 action 过滤与分页；审计默认保留 90 天，启动时清理更早记录（`ECG_AUDIT_RETENTION_DAYS`）。
+- 备份：新增 `app/services/backup.py` 与 `business_logic/scripts/backup_db.py`，使用 sqlite3 备份 API，写入 `runtime/backups/health-<时间戳>.sqlite3`，校验完整性并保留最近 N 份；[运维与备份](operations.md)记录恢复步骤。
+- 页面：详情页波形支持按时间窗调用 `/records/{id}/waveform` 查看局部包络并可恢复全览；历史页支持每页 10/20/50；补充打印样式。
+
+验证：
+
+- 后端 42 项通过（P1 的 38 项 + 4 项 P2：任务事件、审计查询与过滤、保留清理、备份与保留策略）。
+- 前端 `npm run build` 通过（45 个模块，dist JS 203.0 KB）。
+- 备份函数在测试库上连续生成 3 份并只保留 2 份，备份文件 `integrity_check=ok` 且记录数可读。
+
+未验证/未完成：真实浏览器人工验收；软删除与更细的保留策略；公开样例下载入口；前端自动化测试（无 vitest 依赖）；审计查询本身的页面（当前只有接口）。
+
+## 现场问题修复（2026-10-28 浏览器验收）
+
+- 概览报“时区无效”：浏览器返回 `Etc/GMT-8`，原逻辑只识别 UTC/GMT/Z 与部分中国 IANA 名称。现在支持 `Etc/GMT±N`、`GMT±N`/`UTC±N` 固定偏移（`Etc/GMT-8` 表示 UTC+8），并增加趋势边界用例。
+- 详情提示“无法给出明确辅助分类，请重新测量”：当 `prediction.status=model_unavailable` 时，模板解释被误当成“结果不确定”。页面改为单独说明“只完成信号检查”，列出常见原因（未装模型依赖，或输入不满足 500 Hz、10 秒）并隐藏不适用的一般解读；`skipped_quality` 仍提示质量不足。
+- 现场核对：用户记录 quality=basic_checks_passed、prediction.status=model_unavailable；`.venv-tasks` 未安装 openecg，而 `.env` 写的是 openecg，因此降级为无模型。改用 `.venv` 启动后，同一 PTB-XL 500 Hz 样本得到 classified / normal / 置信度 1.0 / 心率 64 / 11 拍，约 1.5 秒完成。
+- 验证：后端 42 项通过；前端构建通过（45 modules，203.66 KB JS）。

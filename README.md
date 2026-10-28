@@ -20,7 +20,9 @@ npm ci
 npm run dev
 ```
 
-打开终端输出的 Vite 地址（通常 http://127.0.0.1:5173），注册账号、登录，使用“合成回放”或单列 CSV。API 文档：http://127.0.0.1:8000/docs 。没有默认账号。记录保存在仓库 `runtime/`，不提交到 Git。
+打开终端输出的 Vite 地址（通常 http://127.0.0.1:5173），注册账号、登录，使用“合成回放”或单列 CSV。API 文档：http://127.0.0.1:8000/docs 。没有默认账号。记录保存在仓库 `runtime/`，不提交到 Git。Windows PowerShell 若提示 `npm.ps1` 禁止运行脚本，改用 `npm.cmd run dev`。
+
+完整步骤、启动代码与常见报错见[启动指南](docs/GETTING_STARTED.md)。
 
 验证命令（仓库根目录）：
 
@@ -43,9 +45,9 @@ Windows PowerShell（仓库根目录）：
 
     .venv/Scripts/python.exe run_backend.py
 
-模型首次运行可能需要获取模型资源，请确保网络可用。当前适配器只接受 500 Hz、至少 10 秒的单导联 mV 信号，并仅分析前 10 秒。不能通过改填采样率或重复数据来凑时长。
+模型首次运行可能需要获取模型资源，请确保网络可用。当前适配器只接受 500 Hz、至少 10 秒的单导联 mV 信号，并仅分析前 10 秒。不能通过改填采样率或重复数据来凑时长。依赖装在哪个虚拟环境，就用哪个环境的 python 启动；只在 .env 写 openecg 不会安装模型包，启动后记录一直显示“未接入模型”时先用该环境的 python -c "import openecg" 自检。
 
-已提供 csv/ptbxl_00001_lead_II_500Hz_10s.csv：PTB-XL 公开记录的 II 导联，5000 点、500 Hz、10 秒。导入时采样率填 500，来源、转换说明及 CC BY 4.0 许可见 [样本说明](csv/README.md)。旧记录不会自动重新分析；安装或调整模型后需要重启后端并创建新记录。
+已提供 csv/ptbxl_00001_lead_II_500Hz_10s.csv：PTB-XL 公开记录的 II 导联，5000 点、500 Hz、10 秒。导入时采样率填 500，来源、转换说明及 CC BY 4.0 许可见 [样本说明](csv/README.md)。旧记录不会自动重新分析；可在详情页点“重新分析”或新建记录。
 
 外部解释模块目前读取进程环境变量，单独在 .env 填写 DeepSeek 变量不会启用远程解释。没有显式启用时使用本地模板；API Key 不提交 Git。OpenECG 分类成功与外部大模型解释是两项独立功能。
 
@@ -89,10 +91,10 @@ flowchart LR
 
 ## 已接通与待开发
 
-- 已接通：账号注册/登录/退出、受保护 API、CSV/合成输入、基础有效性检查、波形、SQLite 记录保存与详情、家属直接授权及撤回、站内授权提示。
+- 已接通：账号注册/登录/退出、受保护 API、CSV/合成输入、基础有效性检查、波形、SQLite 记录保存与详情、家属直接授权及撤回、站内授权提示；任务列表与取消、重启恢复、记录摘要/筛选/趋势时区、数据库迁移与健康自检；波形外置存储、窗口波形接口、原始文件下载、重分析与备注；任务事件时间线、访问审计查询与保留清理、数据库备份脚本。
 - 基础质量仅检查长度、有限数值与平直，不表示已完成噪声检测。默认框架模式不生成心率；可选 OpenECG 路径能产生分类与心率，但不等于已完成自研信号算法或模型性能评价。
 - 未接模型返回 `model_unavailable`，质量不足返回 `skipped_quality`；分类与置信字段为空，不输出模拟“正常”。WebSocket 未就绪时拒绝连接，不返回固定心率。
-- 当前上传/回放返回 HTTP 202 和任务编号，由后台执行，状态通过 `/api/v1/tasks/{id}` 查询；`task_status=completed` 表示流水线结束，不代表已产生 AI 分类。任务状态和输入已持久化；重启后未完成任务标为 failed 并提示重新提交。历史分页、记录趋势汇总、本人 CSV/JSON 导出和删除已实现；邀请确认及外部健康警报仍待开发。
+- 当前上传/回放返回 HTTP 202 和任务编号，由进程内单 worker 队列执行，状态通过 `/api/v1/tasks/{id}` 查询；`task_status=completed` 表示流水线结束，不代表已产生 AI 分类。任务状态和输入已持久化；重启后 pending 任务重新入队，running 任务标为 `interrupted`（单进程前提）。历史分页、记录筛选、趋势汇总（含时区）、本人 CSV/JSON 导出和删除、原件下载、重分析与备注已实现；邀请确认及外部健康警报仍待开发。
 - 单导联心拍任务优先；原 ECGFounder 12 导联清单是扩展参考，不是当前已加载模型。
 
 ## 可选代码与审查边界
@@ -118,4 +120,6 @@ flowchart LR
 .venv-tasks\Scripts\python.exe run_backend.py
 ```
 
-前端仍在 frontend 执行 npm run dev。上传后 URL 包含 task 编号，刷新可继续查询；完成后自动进入记录详情。当前为单进程后台任务，勿启用多 worker。重启未完成任务会失败并提示重新提交，尚无自动重试队列。
+前端仍在 frontend 执行 npm run dev。上传后 URL 包含 task 编号，刷新可继续查询；完成后自动进入记录详情。当前为单进程后台任务，勿启用多 worker；重启后 pending 任务自动重新入队，running 任务标为 interrupted（单进程前提），尚无自动重试队列。
+
+备份与恢复见[运维与备份](docs/operations.md)：`python business_logic/scripts/backup_db.py` 会生成带完整性校验的 `runtime/backups/health-*.sqlite3`。
