@@ -1,0 +1,3 @@
+# Optional real ECG classification; base CI does not download models.
+-r business_logic/requirements.txt
+openecg[report]==0.11.0

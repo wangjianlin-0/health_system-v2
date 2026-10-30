@@ -1,5 +1,7 @@
 # 原链路分析与重构设计
 
+总体说明依据[根 README](../../README.md)；本页原仓库问题为历史背景，不能当作当前实现现状。
+
 ## 原仓库的链路与断点
 
 原本计划：STM32/上传 → FastAPI → 信号处理 → AI → React/历史。
@@ -9,14 +11,14 @@
 ## 改造后的可执行结构
 
 ```text
-frontend/src/pages/Login、Family ── auth/family API ── services/family（李运嘉）
+frontend/src/pages/Login、Family ── auth/family API ── services/family（账户模块）
                                               │ 身份、有效授权
-frontend/src/pages/Analyze、Records ── analyze API ── services/records（王书阁）
+frontend/src/pages/Analyze、Records ── analyze API ── services/records（记录模块）
                                                     │
-hardware/acquisition（刘源，回放/未来设备） ── 标准输入  │
-signal_processing/python（林玄初，CSV/质量） ────────┤
+hardware/acquisition（硬件模块，回放/未来设备） ── 标准输入  │
+signal_processing/python（信号模块，CSV/质量） ────────┤
                                                     ▼
-ai_model/pipeline（唐一可） → process → 质量判断 → inference/factory
+ai_model/pipeline（模型模块） → process → 质量判断 → inference/factory
                                                     │
                                   records 保存结果 → SQLite → 页面回看
 ```
@@ -25,7 +27,7 @@ ai_model/pipeline（唐一可） → process → 质量判断 → inference/fact
 
 ## 状态与边界
 
-- 同步框架：完成有效性处理并持久化后返回 completed；失败请求返回 HTTP 错误，不写成功结果。持久化 pending/running/failed 队列是王书阁下一阶段任务。
+- 任务框架：上传/回放返回 202 与 pending 任务；后台更新 running/completed/failed。文件格式错误直接拒绝，分析错误写入任务。重启后未完成任务标为 failed，提示重新提交。
 - 质量状态 independent：insufficient/basic_checks_passed；基础检查不等于完整信号质量判定。
 - 没模型返回 model_unavailable 和空标签；质量不足返回 skipped_quality；不输出固定正常/置信度。
 - 授权与身份每次由后端检查，session 存数据库，退出后失效；仅本地开发使用。
@@ -35,4 +37,8 @@ ai_model/pipeline（唐一可） → process → 质量判断 → inference/fact
 
 沿用 frontend、business_logic、hardware、signal_processing、ai_model、data、interfaces、docs。原 C 头文件、固件草案和模型扩展配置保留作参考。新增忽略规则，后续依赖通过清单重装；上游已跟踪的 node_modules/pyc 留作历史，建议下一次仓库维护时移出跟踪。原固定指标脚本改为根据传入真实预测计算指标。
 
-数据库权威结构在 app/services/storage.py，init.sql 指向该来源，避免双份 schema。Docker 构建上下文改为仓库根目录，以便导入跨领域模块。旧中间件和 config.py 为未挂载参考，不是当前安全或追踪能力的证明。
+数据库权威结构在 business_logic/app/services/storage.py，init.sql 指向该来源，避免双份 schema。Docker 构建上下文改为仓库根目录，以便导入跨领域模块。旧中间件和 config.py 为未挂载参考，不是当前安全或追踪能力的证明。
+
+## 2026-10-21 审查补充
+
+流水线已包含可选 OpenECG 与 evidence/解释模块；默认无分类器，不表示真实模型已验收。现有采集 CSV 测试与单列解析实现冲突。WebSocket 实际完整路径为 /api/v1/ws/realtime。完整审查及验证限制见[验证记录](../VALIDATION.md)。

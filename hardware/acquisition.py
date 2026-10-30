@@ -1,4 +1,4 @@
-"""刘源：回放输入与未来设备接入。未连接真实设备。"""
+"""硬件模块：回放输入与未来设备接入。未连接真实设备。"""
 import math
 
 def sample():
@@ -11,4 +11,4 @@ def sample():
     return {'samples': values, 'sample_rate_hz': rate, 'unit': 'mV', 'lead': 'synthetic', 'source': 'synthetic_replay'}
 
 def device_status():
-    return {'connected': False, 'mode': 'replay_only', 'message': '真实设备适配器待刘源实现；当前仅支持合成回放'}
+    return {'connected': False, 'mode': 'replay_only', 'message': '真实设备适配器待硬件模块实现；当前仅支持合成回放'}

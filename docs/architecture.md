@@ -1,48 +1,41 @@
 # 系统架构
 
-## 版本: 1.0 | 更新: 2026-10-19
-
 ## 概述
 
-ECG 智能分析系统架构。
+依据[根 README](../README.md)，保留现有 React + TypeScript + FastAPI、SQLite 及主要目录。详细链路见[概览](architecture/overview.md)。
 
 ## 组件
 
-```
-Hardware → Backend → Frontend
-              ↑
-         AI Model
-              ↑
-      Signal Processing
+```text
+CSV/合成回放 → 标准信号 → pipeline.analyze → process → 质量判断 → 可选分类器
+                                 ↓
+                       记录服务 → SQLite → React
+身份与有效授权 ─────────→ 每次查询核验
 ```
 
 ## 模块
 
-| 模块 | 技术 |
-|------|------|
-| Hardware | STM32 |
-| Signal Processing | Python/C |
-| AI Model | TensorFlow/ONNX |
-| Backend | FastAPI |
-| Frontend | React |
+| 模块 | 当前状态与负责人 |
+|---|---|
+| Hardware | 硬件模块；合成回放可用，真实设备未接入，STM32 为草案 |
+| Signal Processing | 信号模块；Python 单列 CSV 与基础检查，正式算法待实现，C 为扩展 |
+| AI Model | 模型模块；默认无模型，可选 OpenECG 和解释代码未完成真实运行验收 |
+| Backend | 记录模块负责记录、存储与服务框架；账户模块负责身份、家庭与通知 |
+| Frontend | 两人各负责对应业务的页面与接口 |
 
 ## 数据流
 
-1. 硬件采集 → 协议传输
-2. 后台接收 → 信号处理
-3. AI 推理 → 结果存储
-4. 前端展示
+1. 上传调用统一解析，采集回放明确标注来源。
+2. 记录服务调用 ai_model.pipeline.analyze，不重复实现信号和模型算法。
+3. 当前持久化任务和输入后返回 202，由后台处理并保存；重启遗留任务标为失败。
+4. 本人或有效授权用户回看；撤回后后续查询拒绝。
 
 ## TODO
 
-- [ ] 补充详细架构图
-- [ ] 添加部署架构
+- [ ] 记录模块：任务持久化、异步恢复、分页/趋势、导出删除。
+- [ ] 账户模块：邀请确认、细分权限、通知状态。
+- [ ] 硬件模块、信号模块、模型模块：真实设备、正式处理与独立模型评价。
 
 ## 负责人更新
 
-| 日期 | 更新内容 |
-|------|----------|
-# 本分支架构入口
-
-本次改造以 [overview](architecture/overview.md) 和 [五人分工](team_assignment.md) 为准。下文保留旧方案参考。
-
+2026-10-21：按根 README 统一说明，不改代码框架。

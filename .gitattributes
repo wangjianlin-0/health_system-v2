@@ -1,0 +1,2 @@
+# Keep the public fixture checksum reproducible across Windows and Linux.
+csv/ptbxl_00001_lead_II_500Hz_10s.csv text eol=lf

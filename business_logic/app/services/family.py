@@ -1,4 +1,4 @@
-"""李运嘉：身份、家庭协同及对应接口逻辑。"""
+"""账户模块：身份、家庭协同及对应接口逻辑。"""
 import hashlib
 import hmac
 import secrets

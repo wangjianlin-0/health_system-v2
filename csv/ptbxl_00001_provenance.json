@@ -1,0 +1,14 @@
+{
+  "source": "PhysioNet PTB-XL v1.0.3",
+  "source_url": "https://physionet.org/content/ptb-xl/1.0.3/",
+  "original_record": "records500/00000/00001_hr",
+  "lead": "II",
+  "sample_rate_hz": 500,
+  "sample_count": 5000,
+  "duration_seconds": 10.0,
+  "unit": "mV",
+  "conversion": "WFDB format 16 little-endian, interleaved 12 leads; extract lead II; physical mV=(ADC-0)/1000; no resampling, repetition or padding",
+  "csv_sha256": "01fa63a3687188b7be58e4b84c8dab0480d3c04777f1c578f5d1ad709fde5d4b",
+  "usage": "Public reference ECG for software testing; not the account holder ECG",
+  "license_file": "LICENSE-PTBXL.txt"
+}
