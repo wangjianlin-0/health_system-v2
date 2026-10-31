@@ -50,6 +50,49 @@ def test_elderly_explanation_is_warm_and_actionable(monkeypatch):
     assert '身体整体是否健康' in summary
     assert '身体健康' not in summary
     assert '窦性节律' not in summary
+    assert result['result_guide']['code'] == 'sinus_rhythm_features'
+    assert '只说明记录当时' in result['result_guide']['plain_explanation']
+    assert any(item['urgent_if_yes'] for item in result['symptom_checklist'])
+
+
+def test_result_guide_distinguishes_rate_and_afib_without_diagnosing():
+    from ai_model.explanation.generator import _template
+
+    slow = _template({
+        'classification': {'label': 'normal'},
+        'measurements': {'heart_rate': {'bpm': 45}},
+        'quality': {'status': 'basic_checks_passed'},
+    })
+    assert slow['result_guide']['code'] == 'low_heart_rate'
+    assert '病因判断' in slow['result_guide']['limitations'][0]
+
+    fast = _template({
+        'classification': {'label': 'normal'},
+        'measurements': {'heart_rate': {'bpm': 118}},
+        'quality': {'status': 'basic_checks_passed'},
+    })
+    assert fast['result_guide']['code'] == 'high_heart_rate'
+    assert '安静休息后复测' in fast['result_guide']['recommended_action']
+
+    afib = _template({
+        'classification': {'label': 'atrial_fibrillation'},
+        'measurements': {'heart_rate': {'bpm': 82}},
+        'quality': {'status': 'basic_checks_passed'},
+    })
+    assert afib['result_guide']['code'] == 'atrial_fibrillation_features'
+    assert '不代表已经确诊' in afib['result_guide']['plain_explanation']
+    assert any(item['id'] == 'irregular_duration' for item in afib['symptom_checklist'])
+
+
+def test_normal_result_without_heart_rate_still_has_safe_guide():
+    from ai_model.explanation.generator import _template
+
+    result = _template({
+        'classification': {'label': 'normal'},
+        'quality': {'status': 'basic_checks_passed'},
+    })
+    assert result['result_guide']['code'] == 'sinus_rhythm_features'
+    assert '未获得可靠心率数值' in result['result_guide']['plain_explanation']
 
 
 def test_uncertain_elderly_explanation_reassures_without_guarantees():

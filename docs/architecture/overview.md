@@ -11,14 +11,14 @@
 ## 改造后的可执行结构
 
 ```text
-frontend/src/pages/Login、Family ── auth/family API ── services/family（李运嘉）
+frontend/src/pages/Login、Family ── auth/family API ── services/family（账户模块）
                                               │ 身份、有效授权
-frontend/src/pages/Analyze、Records ── analyze API ── services/records（王书阁）
+frontend/src/pages/Analyze、Records ── analyze API ── services/records（记录模块）
                                                     │
-hardware/acquisition（刘源，回放/未来设备） ── 标准输入  │
-signal_processing/python（林玄初，CSV/质量） ────────┤
+hardware/acquisition（硬件模块，回放/未来设备） ── 标准输入  │
+signal_processing/python（信号模块，CSV/质量） ────────┤
                                                     ▼
-ai_model/pipeline（唐一可） → process → 质量判断 → inference/factory
+ai_model/pipeline（模型模块） → process → 质量判断 → inference/factory
                                                     │
                                   records 保存结果 → SQLite → 页面回看
 ```

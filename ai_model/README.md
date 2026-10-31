@@ -10,6 +10,10 @@
 
 `quality/coach.py` 提供工程质量指标，包括基线漂移、疑似工频干扰、运动突变、信噪比代理值和信号评分，并生成具体复测动作。调用方可以在输入中附加 `previous_quality`，让 `measurement_coach.verification.comparison` 返回本次与上次的评分变化。
 
+## ECGFounder 接入状态
+
+分类器工厂接受 `ECG_MODEL_TYPE=ecgfounder` 并使用 `inference/ecgfounder_adapter.py`。但当前模型 manifest 仍为待接入状态且声明 12 导联；ADS1292R 提供单导联，因此适配器会拒绝伪造多导联输入并返回 `model_unavailable`。只有取得官方可用的单导联权重、推理签名和预处理规范后，才能完成真实推理。配置示例：`ECG_MODEL_TYPE=ecgfounder`、`ECGFOUNDER_WEIGHTS=<官方权重目录>`。
+
 质量教练是测量和结果展示的安全层，不是临床诊断器。当前模型默认不加载；设置 `ECG_MODEL_TYPE=openecg` 后才启用 OpenECG，未加载模型时返回 `model_unavailable`，但决策状态为 `model_uncertain`。
 
 `models/ecg_founder/manifest.json` 是尚未启用的 12 导联扩展参考，不适配当前单导联输入。`eval/model_eval_report.py` 只根据真实预测列表计算指标，不返回固定精度。

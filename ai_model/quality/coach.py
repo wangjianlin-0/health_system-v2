@@ -249,6 +249,8 @@ def build_measurement_coach(
         'low_snr': '请清洁并擦干电极接触处，确认电极贴紧皮肤。',
         'contact_or_flatline': '请重新贴好电极，确认接触牢固且皮肤没有过多汗液。',
         'signal_invalid': '请完整记录至少 10 秒，不要在中途移动或拔掉电极。',
+        'electrode_lead_off': '请重新连接 ECG 电极，确认正负电极均贴紧皮肤后再测量。',
+        'hardware_frame_invalid': '请检查 ADS1292R 供电、SPI 时序和数据线连接后重新采集。',
     }
     actions = []
     for issue in quality.get('issues', []):

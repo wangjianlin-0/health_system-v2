@@ -1,4 +1,4 @@
-"""李运嘉：身份模块 HTTP 接口。"""
+"""账户模块：身份模块 HTTP 接口。"""
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field

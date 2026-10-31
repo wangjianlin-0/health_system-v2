@@ -11,6 +11,9 @@ import ast
 import csv
 import json
 import math
+import random
+import urllib.error
+import urllib.request
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -22,7 +25,13 @@ from ai_model.quality.coach import assess_signal_quality
 TASK_LABELS = ('normal', 'atrial_fibrillation', 'other_abnormality')
 ABSTAIN = 'abstain'
 MODEL_VERSION_FALLBACK = 'openecg-codec-v6'
-LABEL_MAPPING_VERSION = 'ptbxl-scp-record-level-v1'
+LABEL_MAPPING_VERSION = 'ptbxl-rhythm-only-v3'
+AF_CODES = {'AFIB'}
+OTHER_RHYTHM_CODES = {
+    'AFLT', 'SVTAC', 'SARRH', 'SBRAD', 'STACH',
+    'PAC', 'PVC', 'BIGU', 'TRIGU', 'PSVT',
+}
+SUPPORTED_RHYTHM_CODES = AF_CODES | OTHER_RHYTHM_CODES
 
 
 def _parse_codes(value: str) -> dict[str, float]:
@@ -32,7 +41,7 @@ def _parse_codes(value: str) -> dict[str, float]:
     return {str(code).upper(): float(weight) for code, weight in parsed.items()}
 
 
-def map_ptbxl_label(scp_codes: dict[str, float]) -> str | None:
+def map_ptbxl_label_detail(scp_codes: dict[str, float]) -> dict[str, Any]:
     """Map conservative PTB-XL record labels to the OpenECG task labels.
 
     NORM is accepted as normal only when no competing diagnostic superclass or
@@ -40,21 +49,50 @@ def map_ptbxl_label(scp_codes: dict[str, float]) -> str | None:
     PTB-XL explicitly includes AFIB. Other diagnosed records map to the broad
     other_abnormality bucket. Records without a supported diagnosis are omitted.
     """
-    codes = {
-        str(code).upper()
-        for code, likelihood in scp_codes.items()
-        if isinstance(likelihood, (int, float)) and likelihood > 0
+    # PTB-XL stores some rhythm statements with likelihood 0 because the
+    # likelihood field is not applicable. Presence of a supported rhythm code
+    # therefore matters; filtering only values > 0 would silently drop AFIB.
+    codes = {str(code).upper() for code in scp_codes}
+    rhythm_codes = sorted(codes & SUPPORTED_RHYTHM_CODES)
+    if codes & AF_CODES:
+        competing = sorted((codes & OTHER_RHYTHM_CODES) | (codes & {'NORM'}))
+        if competing:
+            return {
+                'label': None,
+                'mapping_status': 'excluded_ambiguous_rhythm',
+                'mapping_reason': 'AFIB coexists with other supported rhythm codes',
+                'rhythm_codes': rhythm_codes,
+            }
+        return {
+            'label': 'atrial_fibrillation',
+            'mapping_status': 'included',
+            'mapping_reason': 'explicit AFIB rhythm statement',
+            'rhythm_codes': rhythm_codes,
+        }
+    if codes & OTHER_RHYTHM_CODES:
+        return {
+            'label': 'other_abnormality',
+            'mapping_status': 'included',
+            'mapping_reason': 'explicit supported non-AF rhythm statement',
+            'rhythm_codes': rhythm_codes,
+        }
+    if 'NORM' in codes and codes <= {'NORM', 'SR'} and scp_codes.get('NORM', 0) > 0:
+        return {
+            'label': 'normal',
+            'mapping_status': 'included',
+            'mapping_reason': 'positive NORM with optional compatible SR statement only',
+            'rhythm_codes': sorted(codes & {'SR'}),
+        }
+    return {
+        'label': None,
+        'mapping_status': 'excluded_task_mismatch',
+        'mapping_reason': 'no supported rhythm truth; morphology/diagnosis is outside the current task',
+        'rhythm_codes': rhythm_codes,
     }
-    rhythms = codes & {'AFIB', 'AFL', 'SVTA', 'SARRH', 'SBRAD', 'SR'}
-    if 'AFIB' in codes:
-        if codes - {'AFIB'}:
-            return 'other_abnormality'
-        return 'atrial_fibrillation'
-    if codes == {'NORM'}:
-        return 'normal'
-    if codes - {'NORM'}:
-        return 'other_abnormality'
-    return None
+
+
+def map_ptbxl_label(scp_codes: dict[str, float]) -> str | None:
+    return map_ptbxl_label_detail(scp_codes)['label']
 
 
 def patient_fold_manifest(metadata_path: Path) -> list[dict[str, Any]]:
@@ -72,13 +110,19 @@ def patient_fold_manifest(metadata_path: Path) -> list[dict[str, Any]]:
         if not patient_id:
             raise ValueError(f"Missing patient_id for ecg_id={row['ecg_id']}")
         patient_folds.setdefault(patient_id, set()).add(fold)
-        true_label = map_ptbxl_label(_parse_codes(row['scp_codes']))
+        parsed_codes = _parse_codes(row['scp_codes'])
+        mapping = map_ptbxl_label_detail(parsed_codes)
+        split = 'final_test' if fold == 10 else 'threshold_development' if fold == 9 else 'train_reference'
         manifest.append({
             'record_id': str(row['ecg_id']),
             'patient_id': patient_id,
             'fold': fold,
-            'split': 'test' if fold in (9, 10) else 'development',
-            'true_label': true_label,
+            'split': split,
+            'true_label': mapping['label'],
+            'mapping_status': mapping['mapping_status'],
+            'mapping_reason': mapping['mapping_reason'],
+            'rhythm_codes': '|'.join(mapping['rhythm_codes']),
+            'scp_codes': json.dumps(parsed_codes, ensure_ascii=False, sort_keys=True),
             'record_path': row['filename_hr'],
             'sample_rate_hz': 500,
             'lead': 'II',
@@ -88,6 +132,74 @@ def patient_fold_manifest(metadata_path: Path) -> list[dict[str, Any]]:
     if leaked:
         raise ValueError(f'Patient leakage across PTB-XL folds: {list(leaked.items())[:5]}')
     return manifest
+
+
+def sample_patient_disjoint_fold(
+    manifest: list[dict[str, Any]],
+    fold: int,
+    per_class: int,
+    seed: int,
+) -> list[dict[str, Any]]:
+    if per_class < 1:
+        raise ValueError('per_class must be positive')
+    selected: list[dict[str, Any]] = []
+    used_patients: set[str] = set()
+    rng = random.Random(seed)
+    for label in TASK_LABELS:
+        by_patient: dict[str, list[dict[str, Any]]] = {}
+        for row in manifest:
+            if row['fold'] == fold and row['true_label'] == label:
+                by_patient.setdefault(row['patient_id'], []).append(row)
+        patients = sorted(by_patient)
+        rng.shuffle(patients)
+        added = 0
+        for patient_id in patients:
+            if patient_id in used_patients:
+                continue
+            patient_rows = sorted(by_patient[patient_id], key=lambda row: row['record_id'])
+            selected.append(patient_rows[0])
+            used_patients.add(patient_id)
+            added += 1
+            if added == per_class:
+                break
+        if added < per_class:
+            raise ValueError(
+                f'Fold {fold} has only {added} patient-disjoint {label} records; '
+                f'requested {per_class}'
+            )
+    return sorted(selected, key=lambda row: (row['true_label'], row['record_id']))
+
+
+def download_ptbxl_records(
+    rows: list[dict[str, Any]],
+    records_root: Path,
+    base_url: str,
+) -> dict[str, int]:
+    downloaded = skipped = 0
+    for row in rows:
+        relative = Path(row['record_path'])
+        if relative.is_absolute() or '..' in relative.parts:
+            raise ValueError(f'Unsafe PTB-XL record path: {relative}')
+        for suffix in ('.hea', '.dat'):
+            target = records_root / relative.with_suffix(suffix)
+            if target.exists() and target.stat().st_size > 0:
+                skipped += 1
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            url = f"{base_url.rstrip('/')}/{relative.as_posix()}{suffix}"
+            request = urllib.request.Request(
+                url, headers={'User-Agent': 'health-system-v2-ptbxl-eval/1.0'}
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    content = response.read()
+            except (urllib.error.URLError, TimeoutError) as exc:
+                raise RuntimeError(f'Failed downloading {url}: {exc}') from exc
+            if not content:
+                raise RuntimeError(f'Empty download: {url}')
+            target.write_bytes(content)
+            downloaded += 1
+    return {'downloaded_files': downloaded, 'already_present_files': skipped}
 
 
 def _safe_divide(numerator: int, denominator: int) -> float:
@@ -147,6 +259,53 @@ def evaluate_predictions(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def classify_error(row: dict[str, Any]) -> str:
+    truth = row.get('true_label')
+    predicted = row.get('evaluated_label', ABSTAIN)
+    failure = str(row.get('failure_reason') or '')
+    if row.get('decision_state') == 'evaluation_error':
+        return 'runtime_or_input_error'
+    if predicted == ABSTAIN:
+        if failure.startswith('quality_gate'):
+            return 'quality_gate_rejection'
+        if 'confidence' in failure:
+            return 'confidence_rejection'
+        return 'model_rejection'
+    if truth != 'normal' and predicted == 'normal':
+        return 'abnormal_missed_as_normal'
+    if truth == 'normal' and predicted != 'normal':
+        return 'normal_false_alarm'
+    if truth != predicted:
+        return 'abnormal_cross_class_error'
+    return 'correct'
+
+
+def build_error_analysis(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    counts: dict[str, int] = {}
+    misses_by_truth: dict[str, int] = {}
+    for row in rows:
+        category = classify_error(row)
+        row['error_category'] = category
+        counts[category] = counts.get(category, 0) + 1
+        if category == 'abnormal_missed_as_normal':
+            truth = str(row.get('true_label'))
+            misses_by_truth[truth] = misses_by_truth.get(truth, 0) + 1
+    abnormal_rows = [row for row in rows if row.get('true_label') != 'normal']
+    missed = counts.get('abnormal_missed_as_normal', 0)
+    return {
+        'error_category_counts': counts,
+        'abnormal_records': len(abnormal_rows),
+        'abnormal_missed_as_normal': missed,
+        'abnormal_miss_rate': _safe_divide(missed, len(abnormal_rows)),
+        'misses_by_true_label': misses_by_truth,
+        'review_priority': [
+            'First review abnormal_missed_as_normal records.',
+            'Confirm rhythm-code truth and lead II waveform before calling a case a model miss.',
+            'Separate quality/input failures from classifier errors.',
+        ],
+    }
+
+
 def _load_ptbxl_record(record_path: Path, lead: str) -> list[float]:
     try:
         import wfdb
@@ -170,13 +329,21 @@ def run_evaluation(
     confidence_threshold: float = 0.55,
     quality_threshold: float = 70.0,
     record_ids: set[str] | None = None,
+    per_class_limit: int | None = None,
+    seed: int = 20261025,
+    exclude_reviewed_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     manifest = patient_fold_manifest(metadata_path)
+    reviewed_patients = {
+        row['patient_id'] for row in manifest
+        if row['record_id'] in (exclude_reviewed_ids or set())
+    }
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = output_dir / 'ptbxl_patient_fold_manifest.csv'
     with manifest_path.open('w', encoding='utf-8-sig', newline='') as file:
         fields = [
             'record_id', 'patient_id', 'fold', 'split', 'true_label',
+            'mapping_status', 'mapping_reason', 'rhythm_codes', 'scp_codes',
             'record_path', 'sample_rate_hz', 'lead', 'label_mapping_version',
         ]
         writer = csv.DictWriter(file, fieldnames=fields)
@@ -185,6 +352,7 @@ def run_evaluation(
     selected = [
         row for row in manifest
         if row['fold'] in folds and row['true_label'] is not None
+        and row['patient_id'] not in reviewed_patients
         and (record_ids is None or row['record_id'] in record_ids)
     ]
     if not selected:
@@ -198,6 +366,17 @@ def run_evaluation(
                 + ', '.join(sorted(missing_ids))
             )
     model = OpenEcgClassifier()
+    if per_class_limit is not None:
+        rng = random.Random(seed)
+        sampled = []
+        for label in TASK_LABELS:
+            candidates = sorted(
+                [row for row in selected if row['true_label'] == label],
+                key=lambda row: row['record_id'],
+            )
+            rng.shuffle(candidates)
+            sampled.extend(candidates[:per_class_limit])
+        selected = sampled
     predictions = []
     for item in selected:
         output: dict[str, Any] = {
@@ -253,17 +432,23 @@ def run_evaluation(
             })
         predictions.append(output)
 
+    error_analysis = build_error_analysis(predictions)
     report = {
         'report_date': date.today().isoformat(),
         'dataset': 'PhysioNet PTB-XL v1.0.3, 500 Hz records',
         'task': 'record-level rhythm screening; not beat classification or clinical validation',
         'split': {
-            'development_folds': sorted(set(range(1, 11)) - folds),
-            'test_folds': sorted(folds),
+            'train_reference_folds': list(range(1, 9)),
+            'threshold_development_fold': 9,
+            'final_test_fold': 10,
+            'evaluated_folds': sorted(folds),
             'patient_disjoint_check': 'passed_for_official_strat_fold_metadata',
             'test_records_selected': len(selected),
             'test_patients_selected': len({row['patient_id'] for row in selected}),
             'record_id_subset': sorted(record_ids) if record_ids is not None else None,
+            'per_class_limit': per_class_limit,
+            'selection_seed': seed,
+            'excluded_reviewed_patient_count': len(reviewed_patients),
         },
         'lead': lead,
         'sample_rate_hz': 500,
@@ -274,6 +459,7 @@ def run_evaluation(
         'quality_threshold': quality_threshold,
         'quality_gate': 'project local engineering score; not a medical standard',
         'metrics': evaluate_predictions(predictions),
+        'error_analysis': error_analysis,
         'label_mapping_counts': {
             label: sum(1 for row in manifest if row['true_label'] == label)
             for label in TASK_LABELS
@@ -291,11 +477,15 @@ def run_evaluation(
     (output_dir / 'ptbxl_metrics.json').write_text(
         json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8'
     )
+    (output_dir / 'ptbxl_error_analysis.json').write_text(
+        json.dumps(error_analysis, ensure_ascii=False, indent=2), encoding='utf-8'
+    )
     with (output_dir / 'ptbxl_errors.csv').open('w', encoding='utf-8-sig', newline='') as file:
         fields = [
             'record_id', 'patient_id', 'fold', 'true_label', 'predicted_label',
             'evaluated_label', 'confidence', 'quality_score', 'decision_state',
-            'failure_reason', 'model_version',
+            'failure_reason', 'error_category', 'mapping_reason',
+            'rhythm_codes', 'record_path', 'model_version',
         ]
         writer = csv.DictWriter(file, fieldnames=fields)
         writer.writeheader()
@@ -304,21 +494,77 @@ def run_evaluation(
             for row in predictions
             if row.get('evaluated_label') != row.get('true_label')
         )
+    with (output_dir / 'ptbxl_false_negatives.csv').open(
+        'w', encoding='utf-8-sig', newline=''
+    ) as file:
+        fields = [
+            'record_id', 'patient_id', 'fold', 'true_label', 'predicted_label',
+            'confidence', 'quality_score', 'mapping_reason', 'rhythm_codes',
+            'record_path', 'model_version',
+        ]
+        writer = csv.DictWriter(file, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(
+            {key: row.get(key) for key in fields}
+            for row in predictions
+            if row.get('error_category') == 'abnormal_missed_as_normal'
+        )
     return report
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--metadata', type=Path, required=True, help='Path to ptbxl_database.csv')
-    parser.add_argument('--records-root', type=Path, help='PTB-XL root containing records500/; required unless --manifest-only')
     parser.add_argument('--output-dir', type=Path, default=Path('runtime/ptbxl_eval'))
-    parser.add_argument('--folds', default='9,10', help='Frozen official test folds, default: 9,10')
+    parser.add_argument(
+        '--folds', default='10',
+        help='Folds to evaluate. Use 9 for threshold development and 10 for final test.',
+    )
     parser.add_argument('--lead', default='II')
     parser.add_argument('--confidence-threshold', type=float, default=0.55)
     parser.add_argument('--quality-threshold', type=float, default=70.0)
     parser.add_argument('--record-ids', help='Optional comma-separated ECG IDs for a smoke-test subset')
+    parser.add_argument('--per-class-limit', type=int, help='Deterministic maximum records per class')
+    parser.add_argument('--seed', type=int, default=20261025)
+    parser.add_argument('--exclude-reviewed-ids', default='', help='Exclude all patients of these previously reviewed ECG IDs')
+    parser.add_argument('--sample-fold', type=int, choices=(9, 10), help='Create a deterministic patient-disjoint sample manifest for fold 9 or 10')
+    parser.add_argument('--per-class', type=int, default=100, help='Records per class when --sample-fold is used')
+    parser.add_argument('--download', action='store_true', help='Download sampled WFDB files from PhysioNet')
+    parser.add_argument('--records-root', type=Path, help='PTB-XL root containing records500/; used by inference or sample download')
+    parser.add_argument('--physionet-base-url', default='https://physionet.org/files/ptb-xl/1.0.3', help='Dataset release URL')
     parser.add_argument('--manifest-only', action='store_true', help='Export patient-disjoint labeled manifest without model inference')
     args = parser.parse_args()
+    if args.per_class_limit is not None and args.per_class_limit < 1:
+        parser.error('--per-class-limit must be positive')
+    if args.sample_fold is not None:
+        if args.per_class < 1:
+            parser.error('--per-class must be positive')
+        if args.download and not args.records_root:
+            parser.error('--records-root is required with --download')
+        manifest = patient_fold_manifest(args.metadata)
+        sampled = sample_patient_disjoint_fold(
+            manifest, args.sample_fold, args.per_class, args.seed
+        )
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        target = args.output_dir / f'ptbxl_fold{args.sample_fold}_sample_manifest.csv'
+        fields = [
+            'record_id', 'patient_id', 'fold', 'split', 'true_label',
+            'mapping_status', 'mapping_reason', 'rhythm_codes', 'scp_codes',
+            'record_path', 'sample_rate_hz', 'lead', 'label_mapping_version',
+        ]
+        with target.open('w', encoding='utf-8-sig', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows({key: row.get(key) for key in fields} for row in sampled)
+        summary = {label: sum(row['true_label'] == label for row in sampled) for label in TASK_LABELS}
+        print(f'Sample manifest: {target.resolve()}')
+        print(f'Fold {args.sample_fold} patient-disjoint sample: {summary}')
+        if args.download:
+            download_stats = download_ptbxl_records(
+                sampled, args.records_root, args.physionet_base_url
+            )
+            print(f'Download summary: {download_stats}')
+        return
     folds = {int(part.strip()) for part in args.folds.split(',') if part.strip()}
     if not folds or not folds.issubset(set(range(1, 11))):
         parser.error('--folds must be comma-separated PTB-XL folds from 1 to 10')
@@ -330,7 +576,11 @@ def main() -> None:
         manifest = patient_fold_manifest(args.metadata)
         args.output_dir.mkdir(parents=True, exist_ok=True)
         target = args.output_dir / 'ptbxl_patient_fold_manifest.csv'
-        fields = ['record_id', 'patient_id', 'fold', 'split', 'true_label', 'record_path', 'sample_rate_hz', 'lead', 'label_mapping_version']
+        fields = [
+            'record_id', 'patient_id', 'fold', 'split', 'true_label',
+            'mapping_status', 'mapping_reason', 'rhythm_codes', 'scp_codes',
+            'record_path', 'sample_rate_hz', 'lead', 'label_mapping_version',
+        ]
         with target.open('w', encoding='utf-8-sig', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=fields)
             writer.writeheader()
@@ -351,6 +601,9 @@ def main() -> None:
         {part.strip() for part in args.record_ids.split(',') if part.strip()}
         if args.record_ids
         else None,
+        args.per_class_limit,
+        args.seed,
+        {part.strip() for part in args.exclude_reviewed_ids.split(',') if part.strip()},
     )
     print(json.dumps(report['metrics'], ensure_ascii=False, indent=2))
     print(f"Full report: {args.output_dir.resolve() / 'ptbxl_metrics.json'}")

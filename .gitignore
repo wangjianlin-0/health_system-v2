@@ -2,10 +2,13 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
+.venv-run/
 .env
 runtime/
+/tmp/
 frontend/dist/
 .pytest_cache/
+.pytest-tmp/
 *.tsbuildinfo
 
 .venv-tasks/
@@ -29,6 +32,12 @@ frontend/dist/
 *.ckpt
 .cache/
 
+# Local test sandboxes (Windows file permissions may block cleanup)
+.ecg-test-*/
+_pytest_tmp/
+tests/.tmp/*
+!tests/.tmp/.gitkeep
+
 # Only publish the documented public ECG fixture
 /csv/**
 !/csv/README.md
@@ -36,3 +45,11 @@ frontend/dist/
 !/csv/ptbxl_00001_lead_II_500Hz_10s.csv
 !/csv/ptbxl_00001_provenance.json
 /test_ecg_normal.csv
+
+# Desktop build and verification artifacts
+/build/
+/dist/
+/.desktop-test/
+/*.spec
+
+/.desktop-exe-test/

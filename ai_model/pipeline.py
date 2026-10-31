@@ -16,6 +16,47 @@ _CLASSIFIER = None
 _CLASSIFIER_READY = False
 
 
+def _apply_hardware_quality(quality: dict[str, Any], hardware_status: dict[str, Any] | None) -> None:
+    if not hardware_status or not hardware_status.get('available'):
+        return
+    issues = list(quality.get('issues', []))
+    reasons = list(quality.get('reasons', []))
+    reason_codes = list(quality.get('reason_codes', []))
+    blocked = False
+    if hardware_status.get('invalid_frame_count', 0):
+        blocked = True
+        reasons.append('ADS1292R 状态帧标记或保留位异常')
+        issues.append({
+            'code': 'hardware_frame_invalid',
+            'label': '采集帧状态异常',
+            'severity': 'high',
+            'evidence': {'invalid_frame_count': hardware_status['invalid_frame_count']},
+        })
+        reason_codes.append('hardware_frame_invalid')
+    if hardware_status.get('ecg_lead_off_frame_count', 0):
+        blocked = True
+        reasons.append('ADS1292R 检测到 ECG 电极导联脱落')
+        issues.append({
+            'code': 'electrode_lead_off',
+            'label': 'ECG 电极接触异常',
+            'severity': 'high',
+            'evidence': {
+                'lead_off_frame_count': hardware_status['ecg_lead_off_frame_count'],
+                'frame_count': hardware_status.get('frame_count'),
+            },
+        })
+        reason_codes.append('electrode_lead_off')
+    if blocked:
+        quality['status'] = 'insufficient'
+        quality['classification_eligible'] = False
+        quality['score'] = min(float(quality.get('score', 100.0)), 20.0)
+        quality['grade'] = 'invalid'
+    quality['issues'] = issues
+    quality['reasons'] = list(dict.fromkeys(reasons))
+    quality['reason_codes'] = list(dict.fromkeys(reason_codes))
+    quality['hardware_status_checked'] = True
+
+
 def classify(processed: dict[str, Any]) -> dict[str, Any]:
     global _CLASSIFIER, _CLASSIFIER_READY
     if not _CLASSIFIER_READY:
@@ -73,6 +114,7 @@ def analyze(signal):
         result['sample_rate_hz'],
     )
     result['quality'].update(measured_quality)
+    _apply_hardware_quality(result['quality'], result.get('hardware_status'))
     coach = build_measurement_coach(
         result['quality'],
         signal.get('previous_quality'),
@@ -90,5 +132,6 @@ def analyze(signal):
     prediction['explanation'] = explanation.get('summary', '')
     result['prediction'] = prediction
     result['source'] = signal.get('source', 'unknown')
-    result['mode'] = 'openecg-evidence-pipeline' if prediction['status'] == 'classified' else 'framework_demo'
+    model_name = str(prediction.get('model_version') or '').split('-')[0]
+    result['mode'] = f'{model_name}-evidence-pipeline' if prediction['status'] == 'classified' else 'framework_demo'
     return result

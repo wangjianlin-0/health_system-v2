@@ -1,4 +1,4 @@
-// 李运嘉：公共框架与身份入口。记录页面由王书阁维护。
+// 账户模块：公共框架与身份入口。记录页面由记录模块维护。
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/layout/Layout';

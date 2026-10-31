@@ -129,6 +129,156 @@ def _common_fields(labels: list[str], limitations: list[str]) -> dict[str, Any]:
     }
 
 
+def _heart_rate_value(payload: dict[str, Any]) -> float | None:
+    heart_rate = (payload.get('measurements') or {}).get('heart_rate') or {}
+    bpm = heart_rate.get('bpm')
+    if isinstance(bpm, (int, float)) and bpm > 0:
+        return float(bpm)
+    return None
+
+
+def _result_guide(payload: dict[str, Any]) -> dict[str, Any]:
+    classification = (payload.get('classification') or {}).get('label')
+    decision = payload.get('decision') or {}
+    quality = payload.get('quality') or {}
+    bpm = _heart_rate_value(payload)
+    bpm_text = f'{bpm:g} 次/分' if bpm is not None else '未获得可靠心率数值'
+
+    if quality.get('status') == 'insufficient' or classification == 'too_noisy':
+        return {
+            'code': 'poor_signal',
+            'title': '记录质量不足',
+            'tone': 'neutral',
+            'plain_explanation': '这次信号没有录清楚，因此不能可靠判断心跳属于哪一种情况。信号不清楚不代表心脏一定有问题。',
+            'professional_explanation': '当前记录未通过信号质量门控，节律分类已被抑制，不应展示正常或异常结论。',
+            'rate_context': bpm_text,
+            'possible_influences': ['身体移动或说话', '电极接触不良', '导线拉扯或周围电气干扰'],
+            'limitations': ['本次不提供节律分类。', '调整测量条件并获得清晰记录后才能重新分析。'],
+            'recommended_action': '按测量指导重新记录；如果同时存在明显不适，不要等待复测结果，应及时就医。',
+        }
+
+    if decision.get('state') == 'model_uncertain' or classification in (None, 'unknown'):
+        return {
+            'code': 'inconclusive',
+            'title': '暂时无法判断',
+            'tone': 'neutral',
+            'plain_explanation': '这次虽然可能录到了波形，但现有信息还不足以给出可靠分类。不确定不等于一定存在疾病。',
+            'professional_explanation': '当前结果处于模型不确定或未完成分类状态，不满足确定性节律结果的展示条件。',
+            'rate_context': bpm_text,
+            'possible_influences': [],
+            'limitations': ['不能把“无法判断”理解为正常或异常。', '需要结合复测、症状和专业检查进一步确认。'],
+            'recommended_action': '建议安静休息后复测并保存记录；如反复无法判断或伴随不适，请咨询专业人员。',
+        }
+
+    if classification == 'atrial_fibrillation':
+        return {
+            'code': 'atrial_fibrillation_features',
+            'title': '房颤相关特征',
+            'tone': 'warning',
+            'plain_explanation': '这段记录里的心跳间隔出现了与房颤相似的不规则表现。这是一项筛查提示，不代表已经确诊房颤。',
+            'professional_explanation': '模型提示房颤相关节律特征，需要结合原始波形、重复记录、症状及临床心电检查复核。',
+            'rate_context': f'本次记录心率：{bpm_text}。心率数值本身不能单独确认或否定房颤。',
+            'possible_influences': [],
+            'limitations': ['短时单导联记录不能代替临床诊断。', '该结果只反映本次记录时段，不能说明其他时间是否存在或不存在房颤。'],
+            'recommended_action': '保存记录并尽快请专业人员复核；如果这是首次出现的提示，更应主动咨询医生。',
+        }
+
+    if bpm is not None and bpm < 50:
+        return {
+            'code': 'low_heart_rate',
+            'title': '心率偏低',
+            'tone': 'warning',
+            'plain_explanation': f'这次测到的心率约为每分钟 {bpm:g} 次，低于本系统常规结果卡使用的每分钟 50 次界限。是否需要处理，要结合当时是否休息、平时心率、用药和不舒服的感觉判断。',
+            'professional_explanation': '本次记录心率低于 50 次/分，属于低心率提示；单次短时记录不能直接判断其生理性或病理性。',
+            'rate_context': f'本次记录心率：{bpm_text}。',
+            'possible_influences': ['睡眠或深度休息状态', '长期运动训练', '影响心率的药物', '需要排查的心脏传导问题'],
+            'limitations': ['上述内容仅是可能相关因素，不是本系统作出的病因判断。', '需要结合症状、既往心率、用药和临床检查。'],
+            'recommended_action': '如果反复出现，或伴随头晕、乏力、近乎晕厥等情况，建议尽快咨询医生。',
+        }
+
+    if bpm is not None and bpm > 100:
+        return {
+            'code': 'high_heart_rate',
+            'title': '心率偏高',
+            'tone': 'warning',
+            'plain_explanation': f'这次测到的心率约为每分钟 {bpm:g} 次，高于安静状态结果卡使用的每分钟 100 次界限。运动、紧张或身体不适都可能让心率加快，但不能仅凭这次记录判断原因。',
+            'professional_explanation': '本次记录心率高于 100 次/分，属于高心率提示；需要结合测量状态、节律规则性、症状和临床资料判断。',
+            'rate_context': f'本次记录心率：{bpm_text}。',
+            'possible_influences': ['刚进行活动或情绪紧张', '发热、感染或脱水', '酒精、咖啡因或部分药物', '需要复核的房颤或其他心律失常'],
+            'limitations': ['上述内容仅是可能相关因素，不是本系统作出的病因判断。', '安静状态复测仍持续偏高时更需要专业评估。'],
+            'recommended_action': '先停止活动并安静休息后复测；如持续偏高或伴随胸痛、呼吸困难、明显头晕等症状，应及时就医。',
+        }
+
+    if classification == 'normal':
+        return {
+            'code': 'sinus_rhythm_features',
+            'title': '窦性节律特征',
+            'tone': 'positive',
+            'plain_explanation': f'这段记录里的心跳节奏比较均匀，本次{bpm_text}。它只说明记录当时的情况，不代表心跳一直都规则，也不代表身体整体没有问题。',
+            'professional_explanation': '本次辅助分类呈正常窦性节律特征，即记录时段内心跳节奏大体均匀，未达到当前模型其他分类的提示条件。',
+            'rate_context': f'本次记录心率：{bpm_text}；当前结果卡的窦性节律展示区间为 50–100 次/分。',
+            'possible_influences': [],
+            'limitations': ['只代表本次记录时段，不能排除间歇性异常。', '不能据此判断心脏或身体整体健康。'],
+            'recommended_action': '保存记录供以后对比；无论结果如何，只要感到不舒服或出现症状，都建议咨询医生。',
+        }
+
+    return {
+        'code': 'other_rhythm_features',
+        'title': '其他需要复核的节律特征',
+        'tone': 'warning',
+        'plain_explanation': '这段记录里出现了需要进一步查看的心跳特征，但目前不能仅凭这一小段记录说明具体是什么问题。',
+        'professional_explanation': '模型提示其他异常节律可能，当前证据不足以确定具体类型或临床诊断。',
+        'rate_context': f'本次记录心率：{bpm_text}。',
+        'possible_influences': [],
+        'limitations': ['不能根据该标签推断具体疾病。', '需要结合原始波形、症状、重复记录和临床检查。'],
+        'recommended_action': '建议保存记录、安静复测，并由专业人员结合症状和完整检查复核。',
+    }
+
+
+def _symptom_checklist(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    questions = [
+        {
+            'id': 'chest_pain',
+            'category': '紧急症状',
+            'question': '现在是否有持续胸痛、明显胸部压迫感或胸闷加重？',
+            'urgent_if_yes': True,
+        },
+        {
+            'id': 'severe_breathlessness',
+            'category': '紧急症状',
+            'question': '现在是否明显喘不上气、呼吸困难或无法正常说完整句话？',
+            'urgent_if_yes': True,
+        },
+        {
+            'id': 'fainting',
+            'category': '紧急症状',
+            'question': '是否发生晕厥、突然失去意识，或感觉马上要晕倒？',
+            'urgent_if_yes': True,
+        },
+        {
+            'id': 'palpitations',
+            'category': '相关感受',
+            'question': '测量前后是否有心慌、心跳很快、漏跳一下或突然重重跳一下的感觉？',
+            'urgent_if_yes': False,
+        },
+        {
+            'id': 'dizziness_fatigue',
+            'category': '相关感受',
+            'question': '是否同时出现头晕、眼前发黑、异常乏力或活动耐力下降？',
+            'urgent_if_yes': False,
+        },
+    ]
+    classification = (payload.get('classification') or {}).get('label')
+    if classification == 'atrial_fibrillation':
+        questions.append({
+            'id': 'irregular_duration',
+            'category': '持续情况',
+            'question': '不规则心跳或心慌是否反复出现，单次大约持续多久？',
+            'urgent_if_yes': False,
+        })
+    return questions
+
+
 def _symptom_questions(payload: dict[str, Any]) -> list[str]:
     classification = (payload.get('classification') or {}).get('label')
     concepts = payload.get('concepts') or []
@@ -147,7 +297,17 @@ def _symptom_questions(payload: dict[str, Any]) -> list[str]:
         return [
             '最近有没有心慌、头晕、胸闷或气短？如果有，大约什么时候出现、持续了多久？',
         ]
-    return []
+    return [
+        '测量时或最近有没有心慌、胸闷、气短、头晕或异常乏力？',
+        '有没有持续胸痛、明显呼吸困难、晕厥或接近晕厥？',
+    ]
+
+
+def _attach_structured_fields(result: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    result['symptom_questions'] = _symptom_questions(payload)
+    result['symptom_checklist'] = _symptom_checklist(payload)
+    result['result_guide'] = _result_guide(payload)
+    return result
 
 
 def _ectopy_count(payload: dict[str, Any]) -> int:
@@ -217,8 +377,7 @@ def _template(payload: dict[str, Any]) -> dict[str, Any]:
             'measurement_guidance': baseline_guidance if has_baseline_drift else coach_actions[:3] or ['测量时保持安静和不动。'],
         }
         result.update(_common_fields(labels, limitations))
-        result['symptom_questions'] = _symptom_questions(payload)
-        return result
+        return _attach_structured_fields(result, payload)
     if quality.get('status') == 'insufficient' or classification == 'too_noisy':
         result = {
             'summary': '这次记录的信号不够清楚，先不用紧张，但现在还不能可靠判断心跳情况。',
@@ -231,8 +390,7 @@ def _template(payload: dict[str, Any]) -> dict[str, Any]:
             'measurement_guidance': baseline_guidance if has_baseline_drift else coach_actions[:3] or ['手臂放松并保持不动。', '电极接触处保持清洁、干燥、贴合。'],
         }
         result.update(_common_fields(labels, limitations))
-        result['symptom_questions'] = _symptom_questions(payload)
-        return result
+        return _attach_structured_fields(result, payload)
 
     heart_rate_text = _heart_rate_text(payload)
     if classification == 'normal':
@@ -288,8 +446,7 @@ def _template(payload: dict[str, Any]) -> dict[str, Any]:
             'measurement_guidance': ['保持安静和不动，避免说话、抖动和拉扯导线。'],
         }
     result.update(_common_fields(labels, limitations))
-    result['symptom_questions'] = _symptom_questions(payload)
-    return result
+    return _attach_structured_fields(result, payload)
 
 
 def _llm(payload: dict[str, Any]) -> dict[str, Any]:
@@ -336,6 +493,8 @@ def generate_explanation(payload: dict[str, Any]) -> dict[str, Any]:
                 result['elderly_summary'] = template['elderly_summary']
             result['diagnosis_status'] = 'not_a_diagnosis'
             result['symptom_questions'] = template['symptom_questions']
+            result['symptom_checklist'] = template['symptom_checklist']
+            result['result_guide'] = template['result_guide']
             result['provider'] = os.environ.get('ECG_EXPLANATION_PROVIDER')
             result['api_called'] = True
             return result

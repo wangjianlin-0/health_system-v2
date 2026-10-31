@@ -1,3 +1,3 @@
 -- 权威 schema 与初始化代码位于 app/services/storage.py。
 -- 当前框架用 initialize() 建立 users/sessions/records/grants/notifications。
--- 避免保留与运行服务不一致的第二份建表逻辑；正式迁移由王书阁负责。
+-- 避免保留与运行服务不一致的第二份建表逻辑；正式迁移由记录模块负责。
