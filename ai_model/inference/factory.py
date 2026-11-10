@@ -18,21 +18,16 @@ def load_classifier(model_type: str = 'none', model_path: str = '') -> Classifie
         return OpenEcgClassifier()
     if model_type in ('ecgfounder', 'ecg_founder'):
         from ai_model.inference.ecgfounder_adapter import ECGFounderClassifier
-        return ECGFounderClassifier(model_path)
+        try:
+            return ECGFounderClassifier(model_path)
+        except (ImportError, RuntimeError, ValueError) as exc:
+            return UnavailableClassifier(str(exc))
     raise ValueError(f'不支持的分类器: {model_type}')
 
 
 def configured_classifier() -> Classifier | None:
     model_type = os.environ.get('ECG_MODEL_TYPE', 'none')
-    try:
-        return load_classifier(
-            model_type,
-            os.environ.get('ECGFOUNDER_WEIGHTS', ''),
-        )
-    except (ImportError, RuntimeError, ValueError) as exc:
-        if model_type in ('ecgfounder', 'ecg_founder'):
-            return UnavailableClassifier(str(exc))
-        raise
+    return load_classifier(model_type)
 
 
 class UnavailableClassifier:
