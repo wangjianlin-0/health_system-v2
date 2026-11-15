@@ -27,6 +27,11 @@ def parse_csv(text, sample_rate_hz):
         col = header.index('ecg_raw')
         values = []
         timestamps = []
+        status_frames = []
+        respiration_raw = []
+        respiration_col = header.index('resp_raw') if 'resp_raw' in header else None
+        status_col = next((header.index(name) for name in ('ads_status', 'status_raw', 'status')
+                           if name in header), None)
         for row in rows[1:]:
             if not row or all(not c.strip() for c in row):
                 continue
@@ -34,6 +39,10 @@ def parse_csv(text, sample_rate_hz):
                 raise ValueError('硬件 CSV 缺少 ecg_raw 列值')
             try:
                 values.append(_ads_raw_to_mv(float(row[col])))
+                if respiration_col is not None and len(row) > respiration_col and row[respiration_col].strip():
+                    respiration_raw.append(float(row[respiration_col]))
+                if status_col is not None and len(row) > status_col and row[status_col].strip():
+                    status_frames.append(int(row[status_col].strip(), 0))
                 if 'timestamp(s)' in header:
                     timestamps.append(float(row[header.index('timestamp(s)')]))
             except ValueError as exc:
@@ -47,11 +56,19 @@ def parse_csv(text, sample_rate_hz):
                 for a,b in zip(timestamps, timestamps[1:])
             ):
                 raise ValueError('时间戳不连续或与指定采样率不匹配，不自动补点')
-        return {'samples': values, 'sample_rate_hz': sample_rate_hz, 'unit': 'mV',
+        result = {'samples': values, 'sample_rate_hz': sample_rate_hz, 'unit': 'mV',
                 'lead': 'ecg_single_lead', 'source': 'ads1292r_csv',
                 'conversion': {'encoding': 'offset_binary_24', 'zero_code': ADS_ZERO,
                                'vref_v': ADS_VREF_V, 'pga_gain': ADS_PGA_GAIN,
                                'lsb_mV': ADS_LSB_MV, 'input_column': 'ecg_raw'}}
+        if status_frames:
+            result['status_frames'] = status_frames
+        if respiration_raw:
+            center = float(np.median(respiration_raw))
+            result['respiration_waveform'] = [value - center for value in respiration_raw]
+            result['respiration_sample_rate_hz'] = float(sample_rate_hz)
+            result['respiration_unit'] = 'adc_counts_relative'
+        return result
     if 'ecg_filtered' in header:
         raise ValueError('ecg_filtered 单位未知，请提供 ecg_raw 或已转换的单列 mV')
     values = []
@@ -112,7 +129,8 @@ def process(signal):
               'heart_rate_bpm': None,
               'processing_version': 'ads1292r-mv-v1',
               'filter_metadata': {'profile': 'offline-rhythm-view', 'bandpass_hz': [0.5, min(40, rate*.4)], 'order': 2, 'zero_phase': True, 'notch_hz': 50 if rate > 110 else None, 'notch_q': 30, 'model_waveform': 'unfiltered_mV'}}
-    for key in ('lead', 'source', 'conversion'):
+    for key in ('lead', 'source', 'conversion', 'status_frames', 'respiration_waveform',
+                'respiration_sample_rate_hz', 'respiration_unit'):
         if key in signal:
             result[key] = signal[key]
     return result

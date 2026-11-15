@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import BeatResults from './BeatResults';
 import EcgImageExport from './EcgImageExport';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -30,6 +29,11 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const prediction = result.prediction;
   const quality = result.quality;
   const detail = prediction.explanation_detail;
+  const beatAnalysis = result.beat_analysis;
+  const rhythmAnalysis = result.rhythm_analysis;
+  const rateAnalysis = result.rate_analysis;
+  const respirationAnalysis = result.respiration_analysis;
+  const safety = result.safety;
   const owned = record.owned !== false;
   const modelMissing = prediction.status === 'model_unavailable';
   const [exporting, setExporting] = useState('');
@@ -234,6 +238,25 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       <section>
         <h2>信号质量</h2>
         <p><QualityBadge status={quality.status} score={quality.score} /></p>
+        {quality.grade && <p>质量等级：<strong>{quality.grade}</strong></p>}
+        {quality.metrics && <div className="quality-metrics">
+          <span>基线漂移：{quality.metrics.baseline_wander?.level ?? 'unknown'}
+            {quality.metrics.baseline_wander?.ratio != null ? ` (${(quality.metrics.baseline_wander.ratio * 100).toFixed(1)}%)` : ''}</span>
+          <span>工频干扰：{quality.metrics.powerline_interference?.level ?? 'unknown'}
+            {quality.metrics.powerline_interference?.frequency_hz ? ` (${quality.metrics.powerline_interference.frequency_hz} Hz)` : ''}</span>
+          <span>运动伪差：{quality.metrics.motion_artifact?.level ?? 'unknown'}</span>
+          <span>平直片段：{quality.metrics.flatline ? `${(quality.metrics.flatline.fraction * 100).toFixed(1)}%` : 'unknown'}</span>
+          <span>导联脱落：{quality.metrics.lead_off?.suspected ? '疑似' : '未发现明显线索'}</span>
+          <span>状态帧：{quality.metrics.status_frame?.available
+            ? `${quality.metrics.status_frame.abnormal_count}/${quality.metrics.status_frame.count} 异常` : '未提供'}</span>
+          <span>估算 SNR：{quality.metrics.snr?.db != null ? `${quality.metrics.snr.db.toFixed(1)} dB` : 'unknown'}</span>
+          <span>心拍一致性 bSQI：{quality.metrics.bsqi?.score != null
+            ? `${(quality.metrics.bsqi.score * 100).toFixed(1)}% · ${quality.metrics.bsqi.level}` : 'unknown'}</span>
+        </div>}
+        {quality.warnings && quality.warnings.length > 0 &&
+          <ul>{quality.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
+        {quality.guidance && quality.guidance.length > 0 &&
+          <ul className="quality-guidance">{quality.guidance.map(item => <li key={item}>{item}</li>)}</ul>}
         <p className="hint">{quality.scope}</p>
         {quality.reasons?.length > 0 && <ul>{quality.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
       </section>
@@ -257,7 +280,43 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       </section>
     </div>
 
-    <BeatResults prediction={prediction} />
+    {(beatAnalysis || rhythmAnalysis || rateAnalysis || respirationAnalysis || safety) &&
+      <section className="multimodel-panel">
+        <p className="eyebrow">多模型联合分析</p>
+        <h2>OpenECG 节律 + CNN/HGB 心拍</h2>
+        <div className="analysis-card-grid">
+          {rhythmAnalysis && <article className="analysis-card">
+            <span className="analysis-kicker">整段节律 · OpenECG</span>
+            <strong>{rhythmAnalysis.primary}</strong>
+            <p>置信度：{rhythmAnalysis.confidence == null ? '—' : `${(rhythmAnalysis.confidence * 100).toFixed(0)}%`}</p>
+            <p>模型：{rhythmAnalysis.model_version ?? '—'}</p>
+          </article>}
+          {beatAnalysis && <article className="analysis-card">
+            <span className="analysis-kicker">逐心拍 · {beatAnalysis.source}</span>
+            <strong>{beatAnalysis.total} 个心拍</strong>
+            <p>N {beatAnalysis.counts.normal ?? 0} · S {beatAnalysis.counts.pac ?? 0} · V {beatAnalysis.counts.pvc ?? 0} · F {beatAnalysis.counts.fusion ?? 0}</p>
+            <p>状态：{beatAnalysis.status}</p>
+          </article>}
+          {rateAnalysis && <article className="analysis-card">
+            <span className="analysis-kicker">心率与 RR</span>
+            <strong>{rateAnalysis.average_bpm == null ? '未获得' : `${rateAnalysis.average_bpm} 次/分`}</strong>
+            <p>规则性：{rateAnalysis.regularity ?? '无法判断'}</p>
+            <p>RR：{rateAnalysis.rr_mean_ms == null ? '—' : `${rateAnalysis.rr_mean_ms} ms`}</p>
+          </article>}
+          {respirationAnalysis && <article className="analysis-card">
+            <span className="analysis-kicker">呼吸阻抗</span>
+            <strong>{respirationAnalysis.rate_bpm == null ? '未获得呼吸率' : `${respirationAnalysis.rate_bpm} 次/分`}</strong>
+            <p>分析器：{respirationAnalysis.provider}</p>
+            <p>周期 {respirationAnalysis.cycle_count ?? 0} · 长间隔 {respirationAnalysis.pause_candidates.length}</p>
+          </article>}
+          {safety && <article className={`analysis-card safety-${safety.level}`}>
+            <span className="analysis-kicker">固定安全规则</span>
+            <strong>{safety.level}</strong>
+            <p>{safety.message}</p>
+          </article>}
+        </div>
+        {beatAnalysis?.limitations?.map(item => <p className="hint" key={item}>{item}</p>)}
+      </section>}
     {modelMissing && <div className="notice notice-info">
       <strong>本次只完成了信号检查，没有做 AI 分类。</strong>
       <p>{prediction.explanation || '当前后端没有加载分类模型，未产生标签、心率和心拍统计。'}</p>
@@ -273,8 +332,20 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
 
     {detail && !modelMissing && <section className="explanation">
       <h2>解读</h2>
-      {detail.elderly_summary && <p className="elderly">{detail.elderly_summary}</p>}
-      {detail.professional_interpretation && <p>{detail.professional_interpretation}</p>}
+      {detail.elderly_summary && <div className="plain-summary">
+        <span>先看结论</span><p>{detail.elderly_summary}</p>
+      </div>}
+      {detail.professional_interpretation && <><h3>专业解释</h3><p>{detail.professional_interpretation}</p></>}
+      {detail.condition_education?.length ? <div className="condition-education">
+        <h3>异常相关知识</h3>
+        <p className="hint">以下是一般医学科普，不表示本次记录已经证明相应症状或病因。</p>
+        {detail.condition_education.map(item => <article key={item.condition}>
+          <h4>{item.condition}</h4><p>{item.what_it_means}</p>
+          <strong>可能伴随的感受</strong><ul>{item.possible_symptoms.map(value => <li key={value}>{value}</li>)}</ul>
+          <strong>常见相关因素</strong><ul>{item.common_associations.map(value => <li key={value}>{value}</li>)}</ul>
+          <strong>何时需要就医</strong><ul>{item.when_to_seek_care.map(value => <li key={value}>{value}</li>)}</ul>
+        </article>)}
+      </div> : null}
       {detail.evidence?.length ? <><h3>分析依据</h3><ul>{detail.evidence.map(item => <li key={item}>{item}</li>)}</ul></> : null}
       {detail.uncertainty?.length ? <><h3>不确定说明</h3><ul>{detail.uncertainty.map(item => <li key={item}>{item}</li>)}</ul></> : null}
       {detail.next_steps?.length ? <><h3>下一步建议</h3><ul>{detail.next_steps.map(item => <li key={item}>{item}</li>)}</ul></> : null}

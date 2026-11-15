@@ -21,7 +21,7 @@ def create_app():
     def ui(path: str):
         if path == 'api' or path.startswith('api/'):
             raise HTTPException(status_code=404)
-        return FileResponse(front / 'index.html')
+        return FileResponse(front / 'index.html', headers={'Cache-Control': 'no-store, max-age=0'})
     return app
 
 

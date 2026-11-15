@@ -24,3 +24,17 @@ def test_filter_preserves_model_input_and_attenuates_mains():
     assert .9<amplitude(5)<1.1
     assert amplitude(50)<.01
     assert abs(np.mean(y))<.01
+
+def test_hardware_csv_preserves_relative_respiration_channel():
+    text = (
+        'timestamp(s),resp_raw,ecg_raw,ads_status\n'
+        '0.000,8388608,8388608,0xC00000\n'
+        '0.002,8388708,8388609,0xC00000\n'
+        '0.004,8388508,8388607,0xC00000\n'
+    )
+    result = parse_csv(text, 500)
+    assert result['respiration_waveform'] == [0.0, 100.0, -100.0]
+    assert result['respiration_sample_rate_hz'] == 500
+    assert result['respiration_unit'] == 'adc_counts_relative'
+    processed = process(result)
+    assert processed['respiration_waveform'] == result['respiration_waveform']

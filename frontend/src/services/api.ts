@@ -5,6 +5,21 @@ export interface QualityInfo {
   scope: string;
   score?: number | null;
   grade?: string | null;
+  warnings?: string[];
+  reason_codes?: string[];
+  version?: string;
+  metrics?: {
+    baseline_wander?: {ratio: number | null; level: string};
+    powerline_interference?: {frequency_hz: number | null; ratio: number | null; level: string};
+    motion_artifact?: {outlier_fraction: number | null; level: string};
+    flatline?: {fraction: number; level: string};
+    lead_off?: {suspected: boolean; evidence: string[]};
+    status_frame?: {available: boolean; count: number; abnormal_count: number; abnormal_fraction: number};
+    snr?: {db: number | null; level: string};
+    bsqi?: {score: number | null; level: string; matched: number; detector_a: number; detector_b: number;
+      window_seconds: number; windows: Array<{start_sec: number; end_sec: number; score: number}>};
+  };
+  guidance?: string[];
 }
 export interface HeartRate {
   bpm: number;
@@ -23,11 +38,14 @@ export interface Prediction {
   model_version?: string | null;
   explanation: string;
   heart_rate?: HeartRate | null;
+  beat_model?: {requested: string; status?: string; model_version?: string | null};
   beats?: {count: number; vpc_count?: number; classified_count?: number; unclassified_count?: number;
     by_type?: Record<string, number>; items?: BeatItem[]} | null;
   explanation_detail?: {
     elderly_summary?: string;
     professional_interpretation?: string;
+    condition_education?: Array<{condition: string; what_it_means: string; possible_symptoms: string[];
+      common_associations: string[]; when_to_seek_care: string[]; not_patient_facts: boolean}>;
     evidence?: string[];
     uncertainty?: string[];
     reassurance?: string;
@@ -35,6 +53,40 @@ export interface Prediction {
     risk_level?: string;
     provider?: string;
   } | null;
+}
+export interface BeatEvent {
+  sample?: number | null; time_sec?: number | null; label: string; raw_label?: string | null;
+  confidence?: number | null; source?: string;
+}
+export interface BeatAnalysis {
+  status: string; source: string; model_version?: string | null; fallback_reason?: string | null;
+  total: number; counts: Record<string, number>; events: BeatEvent[]; limitations?: string[];
+}
+export interface RPeakAnalysis {
+  status: string; provider: string; reason?: string | null; fallback_reason?: string; count: number;
+  events: Array<{sample: number; time_sec: number; type: string; source: string}>;
+  heart_rate?: HeartRate & {source?: string}; scope: string;
+}
+export interface RhythmAnalysis {
+  status: string; primary: string; raw_label: string; confidence?: number | null;
+  distribution?: Record<string, number>; conduction_flags: string[];
+  ventricular_rhythm: boolean; paced_rhythm: boolean; model_version?: string | null;
+}
+export interface RateAnalysis {
+  result: 'low' | 'in_range' | 'high' | 'unknown'; average_bpm?: number | null;
+  min_bpm?: number | null; max_bpm?: number | null; rr_mean_ms?: number | null;
+  rr_cv?: number | null; regularity?: string | null;
+  display_thresholds: {low_bpm: number; high_bpm: number}; scope: string;
+}
+export interface RespirationAnalysis {
+  available?: boolean; status?: string; provider: string; rate_bpm?: number | null;
+  regularity?: string | null; cycle_count?: number; pause_candidates: Array<{
+    start_sec: number; end_sec: number; duration_sec: number; threshold_sec: number; label: string;
+  }>; calibrated_ohm: boolean; scope?: string; fallback_reason?: string;
+}
+export interface SafetyResult {
+  level: 'urgent_symptoms' | 'repeat_measurement' | 'needs_review' | 'reference_only';
+  urgent: boolean; reasons: string[]; message: string; source: 'fixed_rules';
 }
 export interface BeatItem {
   beat_id: number; r_sample500: number; r_seconds: number; waveform_ready_sample500: number;
@@ -51,6 +103,12 @@ export interface EcgResult {
   lead?: string | null;
   quality: QualityInfo;
   prediction: Prediction;
+  beat_analysis?: BeatAnalysis;
+  r_peak_analysis?: RPeakAnalysis;
+  rhythm_analysis?: RhythmAnalysis;
+  rate_analysis?: RateAnalysis;
+  respiration_analysis?: RespirationAnalysis;
+  safety?: SafetyResult;
   mode?: string;
   processing_version?: string;
   heart_rate_bpm?: number | null;

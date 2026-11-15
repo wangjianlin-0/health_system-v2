@@ -12,6 +12,24 @@ CSV 页面和实时页面按任务明确选择 CNN/HGB，实时模型约每4秒�
 
 基于既有心电项目整合，保留 React + TypeScript + FastAPI 及原主要目录，按模块职责组织业务与分析链路。
 
+## 2026-11-15 多模型融合架构
+
+统一分析入口现按职责拆分模型：CNN/HGB 只负责逐拍 QRS 定位与 N/S/V/F 分类，OpenECG 只负责整段节律分析；两类结果分别写入 `beat_analysis` 与 `rhythm_analysis`，不再互相覆盖。CNN/HGB 不可用时仅在明确选择逐拍模型的情况下调用 NeuroKit2/SciPy 做 R 峰回退；选择 `none` 时保持旧框架行为，不生成推测心率。呼吸通道由独立 `RespirationAnalyzer` 处理，最终再由固定安全规则合并提示。
+
+```mermaid
+flowchart LR
+  A[CSV/实时采集] --> B[统一预处理与质量门控]
+  B --> C[CNN 或 HGB：逐拍检测与 N/S/V/F]
+  B --> D[OpenECG：整段节律分析]
+  B --> E[呼吸阻抗分析]
+  C --> F[逐拍标准化与心率]
+  D --> G[节律标准化]
+  E --> H[呼吸率与规则性]
+  F --> I[安全规则与统一 API/数据库]
+  G --> I
+  H --> I
+```
+
 ## 启动与验证
 
 需要 Python 3.10+、Node.js 20.19+ 或 22.12+。从仓库根目录执行：

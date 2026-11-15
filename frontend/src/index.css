@@ -64,6 +64,10 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 .record-row{display:grid;grid-template-columns:2.2fr 1.4fr .7fr .9fr 1.4fr;gap:12px;align-items:center;padding:14px 4px;border-bottom:1px solid #e1eae7}
 .record-main{display:flex;flex-direction:column;gap:2px}
 .record-quality{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.quality-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 14px;margin:10px 0;font-size:13px;color:#526e74}
+.condition-education{margin-top:20px}.condition-education article{margin:12px 0;padding:14px 16px;border:1px solid #dce8e5;border-radius:12px;background:#fbfdfc}.condition-education h4{margin:0 0 8px;color:#174f55}.condition-education strong{display:block;margin-top:10px}
+.plain-summary{margin:10px 0 20px;padding:18px 20px;border-left:5px solid #2d7d75;border-radius:12px;background:#eef8f5}.plain-summary span{display:block;margin-bottom:7px;font-size:13px;font-weight:700;color:#2d7d75}.plain-summary p{margin:0;font-size:18px;line-height:1.75;color:#173e45}
+@media(max-width:680px){.quality-metrics{grid-template-columns:1fr}}
 .record-metric{font-size:13px;color:#526e74}
 .record-actions{display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .record-actions a{color:#147b74}
@@ -84,4 +88,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 .wave-toolbar input{width:90px;padding:6px 8px;margin:0}
 .wave-toolbar button{padding:7px 11px}
 @media print{.app-header,nav,aside,.actions,.filter-bar,.wave-toolbar,.pager,.link,button{display:none!important}main{max-width:none;margin:0}section{box-shadow:none;border:0;padding:0;margin:0}.stat-grid,.trend-chart,.note-editor{break-inside:avoid}body{background:white}}
+.multimodel-panel{border-top:4px solid #1e6f78}.analysis-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}.analysis-card{margin:0;padding:17px;background:#f7fbf9;border:1px solid #d8e7e4;border-radius:13px;box-shadow:none}.analysis-card strong{display:block;margin:7px 0;color:#173f48;font-size:17px}.analysis-card p{font-size:13px;margin:5px 0}.analysis-kicker{font-size:12px;color:#5c7d79;letter-spacing:.04em}.safety-repeat_measurement,.safety-needs_review{background:#fff7df;border-color:#e4d2a4}.safety-urgent_symptoms{background:#fff0ee;border-color:#d55b50}
+@media(max-width:900px){.analysis-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.analysis-card-grid{grid-template-columns:1fr}}
 @media(max-width:760px){.stat-grid{grid-template-columns:repeat(2,1fr)}.result-grid{grid-template-columns:1fr}.record-row{grid-template-columns:1fr 1fr;gap:8px}.record-actions{grid-column:1/-1;justify-content:flex-start}.record-main{grid-column:1/-1}}

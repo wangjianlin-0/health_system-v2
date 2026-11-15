@@ -52,6 +52,16 @@ CSV 导入页同样支持 CNN/HGB/OpenECG/仅检查选择。CNN/HGB 必须是真
 
 ## 模型、来源和数值约定
 
+### 融合后的模型职责
+
+- CNN/HGB：逐拍模型，输出 R 峰位置、标准化心拍标签及置信度；顶层 `prediction` 保留所选模型结果，兼容既有 API 和数据库。
+- OpenECG：独立节律模型，结果写入 `rhythm_analysis`，不作为 CNN/HGB 的逐拍类别替代。
+- NeuroKit2/SciPy：仅在已选择 CNN/HGB 但逐拍模型失败时用于 R 峰回退，不产生 PAC/PVC 类别。
+- RespirationAnalyzer：处理独立呼吸阻抗通道，输出呼吸率、周期和规则性；缺少有效周期时明确返回无法判断。
+- Safety rules：读取质量、逐拍、节律、心率和呼吸结果，生成确定性的研究提示，不调用模型猜测缺失结论。
+
+默认 `ECG_MODEL_TYPE=none`。网页上传和实时监测会显式传入 CNN/HGB；如需 OpenECG 节律能力，需在运行环境安装 `requirements-ai.txt` 中的依赖。CNN 缺少 PyTorch 时会立即返回 `model_unavailable`，不会等待子进程超时。
+
 来源：[ecg-edge-analysis](https://github.com/lykzr/ecg-edge-analysis)，本地源仓库为 `ecg-edge-analysis-review`，核对时 HEAD 与远端 HEAD 都是 `d83c05616c7d09c3de2aa34d40b1a8042bad0b12`。本次更新提交到课程仓库 `main`，包含此前 `ly-Integration` 中的桌面工作流集成。
 
 | 模型 | 固定联调配置 | 类别 | SHA256 |

@@ -20,7 +20,8 @@ def test_real_cnn_hgb_upload_and_reanalysis(client):
     prediction = result['result']['prediction']
     assert prediction['status'] == 'classified', prediction
     assert prediction['execution_location'] == 'host_pc'
-    assert prediction['beats']['by_type'] == dict(N=55, S=1, V=16, F=0)
+    assert {key: prediction['beats']['by_type'][key] for key in ('normal', 'pac', 'vpc', 'fusion')} == dict(
+        normal=55, pac=1, vpc=16, fusion=0)
     assert result['heart_rate_bpm'] > 0
     assert result['result']['prediction']['explanation_detail']['risk_level'] == 'needs_review'
     assert 'H27' in result['model_version']

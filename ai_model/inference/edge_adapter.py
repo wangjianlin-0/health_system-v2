@@ -1,5 +1,6 @@
 """CNN-H27 / HGB-v92电脑适配；固定fold0，保留逐拍概率与未知状态。"""
 from pathlib import Path
+import importlib.util
 import json
 import math
 import os
@@ -31,6 +32,8 @@ class EdgeClassifier:
             return unavailable('模型输入要求2秒以上的完整记录，最多200000点。')
         if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in values):
             return unavailable('模型输入存在非有限值。')
+        if self.kind == 'cnn' and importlib.util.find_spec('torch') is None:
+            return unavailable('CNN 推理依赖 PyTorch，当前 Python 环境未安装 torch。')
         env = dict(os.environ)
         env.update({name: '4' for name in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')})
         started = time.perf_counter()

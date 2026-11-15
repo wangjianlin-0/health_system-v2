@@ -66,3 +66,83 @@ def test_deepseek_defaults(monkeypatch):
     assert '"model": "deepseek-chat"' in captured['body']
     assert result['provider'] == 'template'
     assert result['api_called'] is False
+
+
+def test_llm_json_is_validated_and_audited(monkeypatch):
+    import json
+    import ai_model.explanation.generator as generator
+
+    monkeypatch.setenv('ECG_EXPLANATION_PROVIDER', 'openai_compatible')
+    monkeypatch.setenv('ECG_LLM_ENDPOINT', 'https://example.invalid/v1')
+    monkeypatch.setenv('ECG_LLM_MODEL', 'medical-explainer')
+    monkeypatch.setenv('ECG_LLM_API_KEY', 'test-key')
+    answer = {
+        'elderly_summary': '本次结果仅供参考。',
+        'professional_interpretation': '已有JSON显示信号可分析。',
+        'condition_education': [],
+        'evidence': ['质量检查通过'],
+        'uncertainty': ['单导联短时记录'],
+        'reassurance': '请结合后续复核。',
+        'next_steps': ['保存记录'],
+        'measurement_guidance': [],
+        'urgent_warning': '出现胸痛或晕厥时及时就医。',
+        'risk_level': 'reference_only',
+        'diagnosis_status': 'not_a_diagnosis',
+    }
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self):
+            return json.dumps({'choices': [{'message': {'content': json.dumps(answer, ensure_ascii=False)}}]}).encode()
+
+    monkeypatch.setattr(generator.request, 'urlopen', lambda req, timeout: Response())
+    result = generator.generate_explanation({
+        'classification': {'label': 'normal'}, 'concepts': [],
+        'measurements': {}, 'quality': {'status': 'basic_checks_passed'},
+    })
+    assert result['provider'] == 'openai_compatible'
+    assert result['model'] == 'medical-explainer'
+    assert result['api_called'] is True
+    assert result['diagnosis_status'] == 'not_a_diagnosis'
+    assert result['latency_ms'] >= 0
+
+
+def test_template_adds_pvc_education_without_claiming_patient_symptoms():
+    result = generate_explanation({
+        'classification': {'label': 'N类55拍；V类16拍', 'task_type': 'beat_level'},
+        'concepts': [], 'measurements': {}, 'quality': {'status': 'basic_checks_passed'},
+        'beat_analysis': {'counts': {'normal': 55, 'pac': 0, 'pvc': 16, 'fusion': 0}},
+        'rate_analysis': {'result': 'in_range', 'average_bpm': 74, 'regularity': 'regular'},
+    })
+    item = next(value for value in result['condition_education'] if '室性早搏' in value['condition'])
+    assert item['not_patient_facts'] is True
+    assert item['possible_symptoms']
+    assert item['common_associations']
+    assert result['elderly_summary']
+    assert '本次记录' in result['elderly_summary']
+    assert '室性提前心拍候选 16 拍' in result['elderly_summary']
+    assert '干扰' not in result['elderly_summary']
+
+
+def test_invalid_llm_json_falls_back_to_template(monkeypatch):
+    import json
+    import ai_model.explanation.generator as generator
+
+    monkeypatch.setenv('ECG_EXPLANATION_PROVIDER', 'openai_compatible')
+    monkeypatch.setenv('ECG_LLM_ENDPOINT', 'https://example.invalid/v1')
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self):
+            return json.dumps({'choices': [{'message': {'content': '{"diagnosis_status":"diagnosed"}'}}]}).encode()
+
+    monkeypatch.setattr(generator.request, 'urlopen', lambda req, timeout: Response())
+    result = generator.generate_explanation({
+        'classification': {'label': 'normal'}, 'concepts': [],
+        'measurements': {}, 'quality': {'status': 'basic_checks_passed'},
+    })
+    assert result['provider'] == 'template'
+    assert result['api_called'] is False
+    assert 'fallback_reason' in result

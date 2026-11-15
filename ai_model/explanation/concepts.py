@@ -74,5 +74,12 @@ def build_evidence_payload(prediction: dict[str, Any], quality: dict[str, Any]) 
             'flags': prediction.get('flags', []),
         },
         'quality': quality,
+        'analysis_scope': {
+            'beat_analysis': prediction.get('beat_analysis'),
+            'rhythm_analysis': prediction.get('rhythm_analysis'),
+            'rate_analysis': prediction.get('rate_analysis'),
+            'respiration_analysis': prediction.get('respiration_analysis'),
+            'safety': prediction.get('safety'),
+        },
         'limitations': ['单导联短时记录', '仅用于辅助分析，不替代临床诊断'],
     }

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AnalysisTask, Prediction, WaveformPoint, post, request } from '../services/api';
-import BeatResults from '../features/analyze/BeatResults';
 import Waveform from '../components/Waveform';
 
 interface Capture {
@@ -115,7 +114,7 @@ export default function Monitor() {
     <p className="hint">波形持续更新；心拍分类约每 4 秒重算本轮完整记录，在线结果至少滞后 2.5 秒，停止后再做整段分析。
       刷新或切换页面不会停止采集。最多 200000 点（约 6 分 40 秒）。</p>
     {session?.prediction?.status === 'model_unavailable' && <p className="notice notice-error">{session.prediction.explanation}</p>}
-    {session?.prediction ? <BeatResults prediction={session.prediction} /> : <p className="empty-state">采集至少 4 秒后，显示第一轮心拍分析。</p>}
+    {!session?.prediction && <p className="empty-state">采集至少 4 秒后，可查看心率预览；保存后在记录详情查看完整分类。</p>}
     <p className="hint">通道 2 为心电，通道 1 原始数据一并保存。无线帧没有序号和校验，无法证明源端无丢样；
       遇到断流或帧错误会停止，重连后请开启新会话。标称电压换算采用 2.42 V、6 倍增益。</p>
   </section>;

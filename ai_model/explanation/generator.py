@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+import time
+from pathlib import Path
 from typing import Any
 from urllib import request
 
 
 EXPLANATION_SYSTEM_PROMPT = """你是“未卜心知”的心电辅助说明助手。
-你的表达要像一位温和、耐心、专业的家庭健康顾问：先让不懂医学的老年人听明白，再补充必要的专业依据。
+你的表达要像一位温和、耐心、专业的家庭健康顾问：第一部分必须先用两三句日常语言总结“这次看到了什么、是否需要复测或复核、现在该做什么”，让不懂医学的老人也能立即听明白；之后再补充专业依据。
 不要声称自己是真实医生，不要把模型结果包装成确诊。
 
 输入是单导联短时心电分析结果。你只能解释输入中已有的分类、概念、测量值和质量信息，
@@ -28,11 +30,19 @@ EXPLANATION_SYSTEM_PROMPT = """你是“未卜心知”的心电辅助说明助�
 10. 建议只能包括保持安静、重新贴好电极、重新测量、保存记录、咨询专业人员等。
 11. 如果输入包含胸痛、胸闷、晕厥、呼吸困难等紧急症状，只提醒立即联系当地急救服务或就近急诊，不分析病因。
 12. 语气安抚但不能保证安全；不要因为安抚而淡化异常结果。
+13. 对输入中实际出现的异常类别，可补充一般医学知识：定义、可能伴随的感受、常见相关因素和需要及时就医的情况。
+14. 必须使用“可能、可见于、部分人会”等条件表达，明确这些知识不表示本次用户已经出现相应症状或病因。
+15. 不得根据心拍类别推断冠心病、心肌炎、电解质异常、药物影响等具体病因；只能列为一般相关因素并建议专业评估。
+16. 不得在没有质量证据时声称“采集时动了、电极没贴好、异常是干扰假象”。只有 quality.warnings、reason_codes、bSQI 或状态帧明确支持时，才能说明对应干扰。
+17. 即使存在噪声，也不能直接否定 PAC、PVC 或融合心拍；应表述为“结果可能受信号质量影响，需要复测或结合原始波形复核”。
+18. 通俗总结优先使用自然叙述：记录时长与总心拍、平均心率和规则性、各异常类别数量、是否需要复测或复核。避免逐字段复述JSON。
+19. 当 quality.status 为 basic_checks_passed、bSQI 较高且没有电极或运动相关 warning/reason 时，不要建议重新贴电极，也不要声称采集不稳；可以建议在相同条件下复测以确认重复性。
 
 只输出严格 JSON，不要 Markdown，字段必须完整：
 {
-  "elderly_summary": "给老人看的两三句通俗结论",
+  "elderly_summary": "必须放在最前面的两三句通俗总结：本次主要发现、需要担心到什么程度、下一步怎么做；避免术语和类别代码",
   "professional_interpretation": "简短专业解释，并翻译术语",
+  "condition_education": [{"condition": "输入中出现的异常", "what_it_means": "通俗定义", "possible_symptoms": ["一般可能伴随的感受"], "common_associations": ["一般常见相关因素"], "when_to_seek_care": ["需要及时就医的情况"], "not_patient_facts": true}],
   "evidence": ["最多3条输入中有依据的证据"],
   "uncertainty": ["至少1条限制或不确定性"],
   "reassurance": "一句温和、不过度保证的安抚",
@@ -50,6 +60,134 @@ risk_level 规则：
 - 只有输入明确出现紧急症状时：urgent_symptoms
 """
 
+REQUIRED_FIELDS = {
+    'elderly_summary': str,
+    'professional_interpretation': str,
+    'condition_education': list,
+    'evidence': list,
+    'uncertainty': list,
+    'reassurance': str,
+    'next_steps': list,
+    'measurement_guidance': list,
+    'urgent_warning': str,
+    'risk_level': str,
+    'diagnosis_status': str,
+}
+RISK_LEVELS = {'reference_only', 'needs_review', 'repeat_measurement', 'urgent_symptoms'}
+
+
+def _load_project_env() -> None:
+    """Load explanation settings from project .env without overriding process env."""
+    env_file = Path(__file__).resolve().parents[2] / '.env'
+    try:
+        lines = env_file.read_text(encoding='utf-8').splitlines()
+    except OSError:
+        return
+    allowed = {
+        'ECG_EXPLANATION_PROVIDER', 'ECG_LLM_ENDPOINT', 'ECG_LLM_MODEL',
+        'ECG_LLM_TIMEOUT', 'ECG_LLM_API_KEY', 'DEEPSEEK_API_KEY',
+    }
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        key, separator, value = stripped.partition('=')
+        key = key.strip()
+        if separator and key in allowed and key not in os.environ:
+            os.environ[key] = value.strip().strip('\"').strip("'")
+
+
+def _validate_llm_result(result: Any) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        raise ValueError('大模型返回值不是 JSON 对象')
+    for field, expected in REQUIRED_FIELDS.items():
+        if not isinstance(result.get(field), expected):
+            raise ValueError(f'大模型返回字段 {field} 缺失或类型错误')
+    if result['diagnosis_status'] != 'not_a_diagnosis':
+        raise ValueError('大模型违反 diagnosis_status 安全约束')
+    if result['risk_level'] not in RISK_LEVELS:
+        raise ValueError('大模型返回未知 risk_level')
+    for field in ('evidence', 'uncertainty', 'next_steps', 'measurement_guidance'):
+        if not all(isinstance(item, str) for item in result[field]):
+            raise ValueError(f'大模型返回字段 {field} 必须是字符串数组')
+    result['evidence'] = result['evidence'][:3]
+    result['uncertainty'] = result['uncertainty'][:3]
+    result['next_steps'] = result['next_steps'][:3]
+    result['measurement_guidance'] = result['measurement_guidance'][:3]
+    for item in result['condition_education']:
+        if not isinstance(item, dict) or not isinstance(item.get('condition'), str):
+            raise ValueError('condition_education 项目格式错误')
+        for field in ('what_it_means',):
+            if not isinstance(item.get(field), str):
+                raise ValueError(f'condition_education.{field} 类型错误')
+        for field in ('possible_symptoms', 'common_associations', 'when_to_seek_care'):
+            if not isinstance(item.get(field), list) or not all(isinstance(value, str) for value in item[field]):
+                raise ValueError(f'condition_education.{field} 必须是字符串数组')
+            item[field] = item[field][:4]
+        item['not_patient_facts'] = True
+    result['condition_education'] = result['condition_education'][:6]
+    return result
+
+
+EDUCATION = {
+    'pac': {
+        'condition': '室上性早搏（PAC/S类心拍）',
+        'what_it_means': '心房或房室交界区提前发出一次心跳信号，形成比预期更早的心拍。',
+        'possible_symptoms': ['部分人没有感觉', '可能感到心跳漏一拍、突然一跳或短暂心悸'],
+        'common_associations': ['疲劳、紧张、睡眠不足', '咖啡因、酒精或吸烟', '也可见于某些心脏或全身状况，需结合临床评估'],
+        'when_to_seek_care': ['反复或持续出现并伴明显不适时咨询专业人员', '伴胸痛、晕厥或呼吸困难时及时就医'],
+    },
+    'pvc': {
+        'condition': '室性早搏（PVC/V类心拍）',
+        'what_it_means': '心室提前产生一次电活动，心拍形态可能与多数正常心拍不同。',
+        'possible_symptoms': ['部分人没有感觉', '可能感到心跳重、停顿感、漏跳感或心悸', '频繁时部分人可能感到乏力或头晕'],
+        'common_associations': ['疲劳、压力、睡眠不足', '咖啡因、酒精、吸烟或部分药物', '也可与电解质、甲状腺或心脏结构问题等相关，但本记录不能判断原因'],
+        'when_to_seek_care': ['新出现、明显增多或持续成串时建议专业复核', '伴胸痛、晕厥、明显气短或持续心动过速时及时就医'],
+    },
+    'fusion': {
+        'condition': '融合心拍（F类心拍）',
+        'what_it_means': '一次正常传导与一次室性激动几乎同时到达心室，形成混合形态的心拍。',
+        'possible_symptoms': ['可能没有明显感觉', '也可能伴随心悸或心跳不规则感'],
+        'common_associations': ['可在存在室性异位活动时出现', '单导联模型也可能把噪声或形态变化误分为融合心拍'],
+        'when_to_seek_care': ['重复记录仍出现时建议结合十二导联心电图复核', '伴明显不适或紧急症状时及时就医'],
+    },
+    'atrial_fibrillation': {
+        'condition': '房颤相关节律特征',
+        'what_it_means': '心房电活动可能快速而不规则，使心室节律呈不规则特征；当前结果不能替代临床确诊。',
+        'possible_symptoms': ['可能没有症状', '可能出现心悸、乏力、头晕、胸闷或活动后气短'],
+        'common_associations': ['年龄增长、高血压和部分心脏疾病', '甲状腺、酒精、感染等因素也可能相关，但不能由本记录确定'],
+        'when_to_seek_care': ['首次出现相关提示时建议尽快专业复核', '伴胸痛、晕厥、严重呼吸困难或神经功能异常时立即就医'],
+    },
+    'fast_rate': {
+        'condition': '心率偏快', 'what_it_means': '本次记录的平均心率高于展示阈值。',
+        'possible_symptoms': ['可能心悸、胸闷、气短、头晕，也可能无明显感觉'],
+        'common_associations': ['运动、紧张、发热、脱水', '贫血、甲状腺或心律问题等也可能相关'],
+        'when_to_seek_care': ['静息时持续偏快或伴明显不适时咨询专业人员', '伴胸痛、晕厥或严重气短时及时就医'],
+    },
+    'slow_rate': {
+        'condition': '心率偏慢', 'what_it_means': '本次记录的平均心率低于展示阈值。',
+        'possible_symptoms': ['可能没有症状', '部分人可能乏力、头晕、活动耐量下降或接近晕厥'],
+        'common_associations': ['睡眠、运动训练状态', '部分药物或传导系统问题等也可能相关'],
+        'when_to_seek_care': ['反复偏慢并伴不适时咨询专业人员', '出现晕厥、胸痛或呼吸困难时及时就医'],
+    },
+}
+
+
+def _condition_education(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    keys: list[str] = []
+    beat = payload.get('beat_analysis') or payload.get('analysis_scope', {}).get('beat_analysis') or {}
+    counts = beat.get('counts') or {}
+    for key in ('pac', 'pvc', 'fusion'):
+        if isinstance(counts.get(key), (int, float)) and counts[key] > 0:
+            keys.append(key)
+    rhythm = payload.get('rhythm_analysis') or payload.get('analysis_scope', {}).get('rhythm_analysis') or {}
+    if rhythm.get('primary') == 'atrial_fibrillation' or payload.get('classification', {}).get('label') == 'atrial_fibrillation':
+        keys.append('atrial_fibrillation')
+    rate = payload.get('rate_analysis') or payload.get('analysis_scope', {}).get('rate_analysis') or {}
+    if rate.get('result') == 'high': keys.append('fast_rate')
+    if rate.get('result') == 'low': keys.append('slow_rate')
+    return [{**EDUCATION[key], 'not_patient_facts': True} for key in dict.fromkeys(keys)]
+
 
 def _heart_rate_text(payload: dict[str, Any]) -> str:
     heart_rate = payload.get('measurements', {}).get('heart_rate') or {}
@@ -57,6 +195,35 @@ def _heart_rate_text(payload: dict[str, Any]) -> str:
     if isinstance(bpm, (int, float)) and bpm > 0:
         return f'心跳大约每分钟 {bpm:g} 次'
     return '这次记录没有得到可靠的心率数值'
+
+
+def _plain_beat_summary(payload: dict[str, Any]) -> str | None:
+    beat = payload.get('beat_analysis') or payload.get('analysis_scope', {}).get('beat_analysis') or {}
+    counts = beat.get('counts') or {}
+    total = beat.get('total')
+    if not isinstance(total, (int, float)):
+        total = sum(value for value in counts.values() if isinstance(value, (int, float)))
+    rate = payload.get('rate_analysis') or payload.get('analysis_scope', {}).get('rate_analysis') or {}
+    bpm = rate.get('average_bpm')
+    if not isinstance(total, (int, float)) or total <= 0:
+        return None
+    parts = [f'本次记录共识别到 {int(total)} 个心拍']
+    if isinstance(bpm, (int, float)):
+        parts.append(f'平均心率约 {bpm:g} 次/分')
+    if rate.get('regularity') == 'regular':
+        parts.append('整体节奏相对规则')
+    elif rate.get('regularity') == 'irregular':
+        parts.append('心跳间隔存在不规则特征')
+    detail = []
+    if counts.get('normal'): detail.append(f"正常类 {int(counts['normal'])} 拍")
+    if counts.get('pac'): detail.append(f"室上性提前心拍候选 {int(counts['pac'])} 拍")
+    if counts.get('pvc'): detail.append(f"室性提前心拍候选 {int(counts['pvc'])} 拍")
+    if counts.get('fusion'): detail.append(f"融合心拍候选 {int(counts['fusion'])} 拍")
+    sentence = '，'.join(parts) + '。'
+    if detail:
+        sentence += '模型逐拍结果包括' + '、'.join(detail) + '。'
+    sentence += '这些结果用于辅助参考，不能单独作为诊断；异常心拍较多或伴有不适时，建议保存记录并请专业人员复核。'
+    return sentence
 
 
 def _common_fields(labels: list[str], limitations: list[str]) -> dict[str, Any]:
@@ -67,6 +234,7 @@ def _common_fields(labels: list[str], limitations: list[str]) -> dict[str, Any]:
         'diagnosis_status': 'not_a_diagnosis',
         'provider': 'template',
         'api_called': False,
+        'condition_education': [],
     }
 
 
@@ -76,6 +244,7 @@ def _template(payload: dict[str, Any]) -> dict[str, Any]:
     labels = [item['label'] for item in concepts]
     quality = payload.get('quality', {})
     limitations = payload.get('limitations', [])
+    education = _condition_education(payload)
     if quality.get('status') == 'insufficient' or classification == 'too_noisy':
         result = {
             'summary': '这次记录的信号不够清楚，先不用紧张，但现在还不能可靠判断心跳情况。',
@@ -88,19 +257,22 @@ def _template(payload: dict[str, Any]) -> dict[str, Any]:
             'measurement_guidance': ['手臂放松并保持不动。', '电极接触处保持清洁、干燥、贴合。'],
         }
         result.update(_common_fields(labels, limitations))
+        result['condition_education'] = education
         return result
 
     heart_rate_text = _heart_rate_text(payload)
     if payload['classification'].get('task_type') == 'beat_level' and classification:
+        plain_summary = _plain_beat_summary(payload)
         result = {
             'summary': f'本次逐拍分类：{classification}。{heart_rate_text}。',
-            'elderly_summary': f'本次记录已完成心拍分类：{classification}。请保存记录作为复核参考。',
+            'elderly_summary': plain_summary or f'本次记录已完成逐拍分析。请保存记录作为复核参考。',
             'professional_interpretation': 'CNN为N/S/V/F四类；HGB为N/S/VF三类。N类不代表健康，VF是V/E/F合并，不是心室颤动。',
             'risk_level': 'needs_review', 'advice': '结果用于课程研究，请结合原始波形复核。',
             'next_steps': ['保存本次记录。', '有不适时请由专业人员复核。'],
             'measurement_guidance': [], 'reassurance': '模型类别是辅助信息，不能直接作出疾病诊断。',
         }
         result.update(_common_fields(labels, limitations))
+        result['condition_education'] = education
         return result
     if classification == 'normal':
         result = {
@@ -147,10 +319,12 @@ def _template(payload: dict[str, Any]) -> dict[str, Any]:
             'measurement_guidance': ['保持安静和不动，避免说话、抖动和拉扯导线。'],
         }
     result.update(_common_fields(labels, limitations))
+    result['condition_education'] = education
     return result
 
 
 def _llm(payload: dict[str, Any]) -> dict[str, Any]:
+    _load_project_env()
     provider = os.environ.get('ECG_EXPLANATION_PROVIDER', 'template')
     endpoint = os.environ.get('ECG_LLM_ENDPOINT')
     if not endpoint and provider == 'deepseek':
@@ -158,11 +332,12 @@ def _llm(payload: dict[str, Any]) -> dict[str, Any]:
     if not endpoint:
         raise RuntimeError('ECG_LLM_ENDPOINT 未配置')
     endpoint = endpoint.rstrip('/') + '/chat/completions'
+    model = os.environ.get(
+        'ECG_LLM_MODEL',
+        'deepseek-chat' if provider == 'deepseek' else 'qwen',
+    )
     body = {
-        'model': os.environ.get(
-            'ECG_LLM_MODEL',
-            'deepseek-chat' if provider == 'deepseek' else 'qwen',
-        ),
+        'model': model,
         'temperature': 0.1,
         'response_format': {'type': 'json_object'},
         'messages': [
@@ -177,12 +352,19 @@ def _llm(payload: dict[str, Any]) -> dict[str, Any]:
     if api_key:
         headers['Authorization'] = f'Bearer {api_key}'
     req = request.Request(endpoint, data=json.dumps(body).encode('utf-8'), headers=headers, method='POST')
+    started = time.perf_counter()
     with request.urlopen(req, timeout=float(os.environ.get('ECG_LLM_TIMEOUT', '10'))) as response:
         content = json.loads(response.read().decode('utf-8'))
-    return json.loads(content['choices'][0]['message']['content'])
+    result = _validate_llm_result(json.loads(content['choices'][0]['message']['content']))
+    result['provider'] = provider
+    result['model'] = model
+    result['api_called'] = True
+    result['latency_ms'] = round((time.perf_counter() - started) * 1000, 1)
+    return result
 
 
 def generate_explanation(payload: dict[str, Any]) -> dict[str, Any]:
+    _load_project_env()
     if os.environ.get('ECG_EXPLANATION_PROVIDER') in ('openai_compatible', 'deepseek'):
         try:
             result = _llm(payload)
@@ -190,8 +372,6 @@ def generate_explanation(payload: dict[str, Any]) -> dict[str, Any]:
             for key, value in template.items():
                 result.setdefault(key, value)
             result['diagnosis_status'] = 'not_a_diagnosis'
-            result['provider'] = os.environ.get('ECG_EXPLANATION_PROVIDER')
-            result['api_called'] = True
             return result
         except Exception as exc:
             result = _template(payload)
