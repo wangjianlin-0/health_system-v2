@@ -1,2 +1,5 @@
 # Keep the public fixture checksum reproducible across Windows and Linux.
 csv/ptbxl_00001_lead_II_500Hz_10s.csv text eol=lf
+# Preserve upstream frozen hashes and portable native executables exactly.
+ai_model/vendor/ecg_edge/** -text
+hardware/vendor/** -text

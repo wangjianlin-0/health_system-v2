@@ -7,12 +7,14 @@ import Dashboard from './pages/Dashboard';
 import Analyze from './pages/Analyze';
 import Records from './pages/Records';
 import Family from './pages/Family';
+import Monitor from './pages/Monitor';
 
 export default function App() {
   const [signedIn, setSignedIn] = useState(Boolean(sessionStorage.getItem('ecg_token')));
   useEffect(() => {const logout=()=>setSignedIn(false); window.addEventListener('ecg:logout',logout);return()=>window.removeEventListener('ecg:logout',logout);},[]);
   if (!signedIn) return <Login onLogin={()=>setSignedIn(true)} />;
   return <Layout><Routes>
+    <Route path="/monitor" element={<Monitor />} />
     <Route path="/" element={<Dashboard />} /><Route path="/analyze" element={<Analyze />} />
     <Route path="/records" element={<Records />} /><Route path="/records/:id" element={<Analyze />} />
     <Route path="/family" element={<Family />} /><Route path="*" element={<Navigate to="/" replace />} />

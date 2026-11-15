@@ -37,11 +37,12 @@ export default function Dashboard() {
   const stats = summary?.summary;
 
   return <section>
-    <p className="eyebrow">五人协作框架</p>
+    <p className="eyebrow">家庭心电辅助记录</p>
     <h1>从一份记录开始</h1>
     <p>{device}</p>
     {error && <p className="notice notice-error" role="alert">{error}</p>}
     <div className="actions">
+      <Link className="button" to="/monitor">实时采集</Link>
       <Link className="button" to="/analyze">导入或回放</Link>
       <Link className="button secondary" to="/records">查看历史</Link>
     </div>

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "sampling_hz": 500,
+  "lead": "单导联；开发评价为II，实际导联须确认",
+  "input_unit": "mV",
+  "maximum_samples": 1800000,
+  "maximum_wait_ticks": 1250,
+  "source_codes_per_mV": 4096,
+  "highpass_hz": 0.5,
+  "window_before": 178,
+  "window_after": 267,
+  "model_points": 128,
+  "features": 192,
+  "classes": [
+    "N",
+    "S",
+    "VF"
+  ],
+  "VF_definition": "原V/E/F合并，非心室颤动",
+  "qualified": false,
+  "model_family": "HistGradientBoostingClassifier",
+  "model_version": "v92",
+  "production_model_selected": false,
+  "folds": [
+    0,
+    1,
+    2
+  ],
+  "supported_preprocessing": [
+    "raw",
+    "hp05"
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "files": {
+    "__init__.py": {
+      "bytes": 76,
+      "sha256": "2be1108fce4c4c741caa0c74e2b7fb5f27fdaf4a845151b05826c204f350eac9"
+    },
+    "assets/fold_0.pt": {
+      "bytes": 107158,
+      "sha256": "16d56a6b1065df35f3e11c4cc285055b421978bd451d5da1b72df8f1744fcfc7"
+    },
+    "assets/fold_1.pt": {
+      "bytes": 107158,
+      "sha256": "8f5d316d3dda43422224f6bea17b8199f4523e58384190e85b60b6f3be57dc19"
+    },
+    "assets/fold_2.pt": {
+      "bytes": 107158,
+      "sha256": "10c2006df93ad36ef1d26688c4075711899dc72bae28f2c8819c70395f838fb1"
+    },
+    "assets/golden_0.npz": {
+      "bytes": 11970,
+      "sha256": "be86f1f798d2b5d9160d0c70c0cbbc512287f68cce3fa47189e5c01ccc1777b6"
+    },
+    "assets/golden_1.npz": {
+      "bytes": 11971,
+      "sha256": "9f0a65d3e7d9ab15cb3edf9304c565ba26c627b5e242bffacbe616b2d412b163"
+    },
+    "assets/golden_2.npz": {
+      "bytes": 11968,
+      "sha256": "18d0a86ea1a23cc19d00e4bf7d518b07c496b873f1792f07faaac4875b30c53e"
+    },
+    "check.py": {
+      "bytes": 4321,
+      "sha256": "c392c3804055b9196ac669a4d326cfa55573c555ebcb5b3f77e4ab54d02a0198"
+    },
+    "expected_inputs.json": {
+      "bytes": 61304,
+      "sha256": "0ed2beb1f5f7fd83a113f807d13d554dce0276cb5c11642d7d75c3d380327d2a"
+    },
+    "expected_predictions.json": {
+      "bytes": 5337,
+      "sha256": "f6c3c33b3ed233c140a636ad957ca9d028f928f4f6b70e08539f86ffa6cbed55"
+    },
+    "feature_names.json": {
+      "bytes": 5643,
+      "sha256": "293aceac8cea59b0970788d77971f22059a4becf5ffc97b0df71650dfd328039"
+    },
+    "features.py": {
+      "bytes": 1030,
+      "sha256": "3827accbb59b542ecf024d72c47428e90fb10f20067acc8ee2d147146818530c"
+    },
+    "generate_synthetic.py": {
+      "bytes": 1556,
+      "sha256": "d24b69172df158bfe8ac38a03e963d5ed89cb8f2c3863d774d5028e15402012c"
+    },
+    "history.json": {
+      "bytes": 61351,
+      "sha256": "9d0d9f49b008dc5aa172acc9454066d501195a4ddd010efa73a5c007a9d96588"
+    },
+    "network.py": {
+      "bytes": 4883,
+      "sha256": "8a1a2c2c92a9ec05bddd0270fcaf8a79096905411d58a92144cfbcc8224cadb0"
+    },
+    "prepare.py": {
+      "bytes": 7440,
+      "sha256": "5e999b932ac33ecf6a640f40aff0fc3d7affcd36e71a083bcf38ece26c0f01c7"
+    },
+    "protocol.json": {
+      "bytes": 2911,
+      "sha256": "5b626d5459923eca41f032de0559da2df7fb3747da53c0d90ea5214a57efae88"
+    },
+    "provenance.json": {
+      "bytes": 1940,
+      "sha256": "13e4702bef211cb5c2f7c225521a78f8e7c8c224ebbf26c3c982f4b19645c45b"
+    },
+    "requirements.txt": {
+      "bytes": 235,
+      "sha256": "58b2a14bef7f3c6842eb00bb58a0951fe5655a7b86780638cde05ae7316e47c9"
+    },
+    "train.py": {
+      "bytes": 10779,
+      "sha256": "30ebba326ce17a02f651056fe9e1962be04b476b7d9f71ee98b0c020b3fb83ab"
+    }
+  },
+  "scope": "H27 full weights, synthetic tests, feature/data/reference-training code and historical evidence; no raw ECG or patient-derived teacher target caches"
+}

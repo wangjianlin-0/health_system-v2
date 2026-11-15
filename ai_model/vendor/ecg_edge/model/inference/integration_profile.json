@@ -1,0 +1,81 @@
+{
+  "status": "TEMPORARY_INTEGRATION_ONLY",
+  "qualified": false,
+  "production_model_selected": false,
+  "model_version": "v92",
+  "fold": 0,
+  "model_file": "assets/v92_fold0.npz",
+  "model_sha256": "375cf45ac1f315ecc517a219cb03340727304db8e7738626ac4b4920a5af00f8",
+  "config_sha256": "cec71feba1a80a6b04c9370c7576f9041660f46b926d990f11870190d2fa6d5f",
+  "sampling_hz": 500,
+  "input_unit": "mV",
+  "primary_preprocess": "hp05",
+  "primary_input": "未额外数字滤波的500Hz单导联mV",
+  "alternative": "已严格匹配原0.5Hz因果高通且逐阶段比对通过的数据才用raw；不重复高通",
+  "forbidden_extra_filters": [
+    "未经验证的带通",
+    "未经验证的陷波",
+    "厂商滤波列",
+    "网页零相位显示输出"
+  ],
+  "validation_subjects_by_fold": [
+    [
+      "incart:9",
+      "incart:21",
+      "incart:26",
+      "incart:6",
+      "incart:29",
+      "incart:11",
+      "incart:24",
+      "incart:30",
+      "incart:14"
+    ],
+    [
+      "incart:28",
+      "incart:15",
+      "incart:1",
+      "incart:25",
+      "incart:5",
+      "incart:16",
+      "incart:19",
+      "incart:13",
+      "incart:12"
+    ],
+    [
+      "incart:17",
+      "incart:18",
+      "incart:20",
+      "incart:7",
+      "incart:4",
+      "incart:3",
+      "incart:27",
+      "incart:2"
+    ]
+  ],
+  "sealed_independent_subjects": [
+    "incart:10",
+    "incart:22",
+    "incart:23",
+    "incart:31",
+    "incart:32",
+    "incart:8"
+  ],
+  "fold_selection_reason": "延续已验证示例便于接口联调，不按最高分选模型、不默认投票；复算开发成绩时必须按原患者外折选择",
+  "state_scope": "当前API每次整段，重建状态；实时跨块状态由系统侧另接，不每块独立调用拼接",
+  "reset_rule": "连续采样分块保持高通/检测/RR/背景/后继状态；缺样或时轴不明/重连/重启/导联或增益切换开新会话并重置全部状态",
+  "highpass": {
+    "a": "500/(500+2*pi*0.5)",
+    "b": [
+      "a",
+      "-a"
+    ],
+    "denominator": [
+      1,
+      "-a"
+    ],
+    "initial_zi": "[-a*x0]",
+    "initial_output": 0,
+    "computation": "float64"
+  },
+  "model_fixture_source_zip_sha256": "0265edf5bb1d467510796eb4be0e8f265a5686acc9dbccb2b3adac7b77036ee5"
+}

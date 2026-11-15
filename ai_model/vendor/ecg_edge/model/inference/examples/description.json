@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "patient_data": false,
+  "samples": 30000,
+  "sampling_hz": 500,
+  "input_unit": "mV",
+  "mode": "hp05",
+  "events": 73,
+  "classified": 72,
+  "golden_source": "既有冻结C检测/重切二进制、原src/reference公式、原sklearn权重；不以新入口生成期望",
+  "fits": 0,
+  "clinical_labels": false
+}

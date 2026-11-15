@@ -27,6 +27,10 @@ frontend/dist/
 *.pt
 *.pth
 *.ckpt
+# Frozen portable H27 research weights migrated with provenance and checksums.
+!ai_model/vendor/ecg_edge/model/cnn_fourclass/assets/fold_0.pt
+!ai_model/vendor/ecg_edge/model/cnn_fourclass/assets/fold_1.pt
+!ai_model/vendor/ecg_edge/model/cnn_fourclass/assets/fold_2.pt
 .cache/
 
 # Local test sandboxes (Windows file permissions may block cleanup)

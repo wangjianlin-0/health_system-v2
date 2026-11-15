@@ -1,0 +1,46 @@
+{
+  "passed": true,
+  "streams": 4,
+  "raw_mV_samples": 1800000,
+  "modes": [
+    "raw",
+    "hp05"
+  ],
+  "maximum_feature_difference": 0,
+  "rows": [
+    {
+      "record": "I01",
+      "mode": "raw",
+      "samples": 900000,
+      "events": 2970,
+      "classified": 2969,
+      "features_exact": true
+    },
+    {
+      "record": "I01",
+      "mode": "hp05",
+      "samples": 900000,
+      "events": 2987,
+      "classified": 2986,
+      "features_exact": true
+    },
+    {
+      "record": "I70",
+      "mode": "raw",
+      "samples": 900000,
+      "events": 1668,
+      "classified": 1667,
+      "features_exact": true
+    },
+    {
+      "record": "I70",
+      "mode": "hp05",
+      "samples": 900000,
+      "events": 1667,
+      "classified": 1666,
+      "features_exact": true
+    }
+  ],
+  "fits": 0,
+  "independent_patients_loaded": false
+}

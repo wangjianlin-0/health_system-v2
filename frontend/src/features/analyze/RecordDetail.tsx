@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import BeatResults from './BeatResults';
+import EcgImageExport from './EcgImageExport';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AnalysisTask, RecordDetail as RecordDetailType, WaveformPoint, WaveformWindow,
@@ -31,8 +33,10 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const owned = record.owned !== false;
   const modelMissing = prediction.status === 'model_unavailable';
   const [exporting, setExporting] = useState('');
+  const [imageExport, setImageExport] = useState(false);
   const [actionError, setActionError] = useState('');
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [nextModel, setNextModel] = useState('');
   const [note, setNote] = useState(record.note ?? '');
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteMessage, setNoteMessage] = useState('');
@@ -82,7 +86,7 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     setReanalyzing(true);
     setActionError('');
     try {
-      const task = await post<AnalysisTask>(`/records/${record.id}/reanalyze`);
+      const task = await post<AnalysisTask>(`/records/${record.id}/reanalyze`, nextModel ? {model_type: nextModel} : {});
       navigate('/analyze?task=' + task.id);
     } catch (caught) {
       setActionError((caught as Error).message);
@@ -153,6 +157,8 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   ];
 
   return <article className="record-detail">
+    {imageExport && <EcgImageExport record={record} start={windowPoints ? windowStart : 0}
+      end={windowPoints ? windowEnd : duration} onClose={() => setImageExport(false)} />}
     <header className="detail-head">
       <div>
         <p className="eyebrow">记录详情</p>
@@ -164,6 +170,7 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
         </p>
       </div>
       <div className="actions detail-actions">
+        <button disabled={!result.waveform?.length} onClick={() => setImageExport(true)}>导出心电图片</button>
         <button className="secondary" disabled={Boolean(exporting)} onClick={() => void exportAs('csv')}>
           {exporting === 'csv' ? '导出中…' : '导出 CSV'}
         </button>
@@ -174,6 +181,10 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
           <button className="secondary" disabled={Boolean(exporting)} onClick={() => void downloadRaw()}>
             {exporting === 'raw' ? '下载中…' : '下载原件'}
           </button>}
+        {owned && <select aria-label="重新分析使用的模型" value={nextModel} onChange={event => setNextModel(event.target.value)}>
+          <option value="">沿用原模型</option><option value="cnn">CNN H27</option><option value="hgb">HGB v92</option>
+          <option value="openecg">OpenECG</option><option value="none">仅信号检查</option>
+        </select>}
         {owned && <button className="secondary" disabled={reanalyzing} onClick={() => void reanalyze()}>
           {reanalyzing ? '提交中…' : '重新分析'}
         </button>}
@@ -242,10 +253,11 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       <section>
         <h2>心拍统计</h2>
         <p>共 {prediction.beats?.count ?? '—'} 个心拍</p>
-        <p className="hint">室性早搏：{prediction.beats?.vpc_count ?? 0} 次</p>
+        {prediction.beats?.vpc_count != null && <p className="hint">室性早搏：{prediction.beats.vpc_count} 次</p>}
       </section>
     </div>
 
+    <BeatResults prediction={prediction} />
     {modelMissing && <div className="notice notice-info">
       <strong>本次只完成了信号检查，没有做 AI 分类。</strong>
       <p>{prediction.explanation || '当前后端没有加载分类模型，未产生标签、心率和心拍统计。'}</p>

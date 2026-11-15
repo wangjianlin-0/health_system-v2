@@ -14,13 +14,17 @@ export interface HeartRate {
   regularity?: string;
 }
 export interface Prediction {
+  classes?: string[];
+  preview?: boolean;
+  inference_ms?: number;
   status: string;
   label: string | null;
   confidence: number | null;
   model_version?: string | null;
   explanation: string;
   heart_rate?: HeartRate | null;
-  beats?: {count: number; vpc_count?: number} | null;
+  beats?: {count: number; vpc_count?: number; classified_count?: number; unclassified_count?: number;
+    by_type?: Record<string, number>; items?: BeatItem[]} | null;
   explanation_detail?: {
     elderly_summary?: string;
     professional_interpretation?: string;
@@ -32,9 +36,15 @@ export interface Prediction {
     provider?: string;
   } | null;
 }
+export interface BeatItem {
+  beat_id: number; r_sample500: number; r_seconds: number; waveform_ready_sample500: number;
+  decision_sample500?: number; valid: boolean; label: string; class_id: number;
+  confidence: number | null; probabilities: number[] | null;
+}
 export interface EcgResult {
   source: string;
   waveform: number[];
+  waveform_processed_mV?: number[];
   sample_rate_hz: number;
   unit: string;
   duration_sec: number;

@@ -1,0 +1,6 @@
+# 本机已验CPU推理/参考训练环境。使用frombuffer避免Torch 2.3与NumPy2桥接。
+numpy==2.2.6
+scipy==1.16.2
+torch==2.3.1
+# 从公开原始记录重建时另需WFDB；本机重建在已有数据环境执行。
+wfdb==4.3.1

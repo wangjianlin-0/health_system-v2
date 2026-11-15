@@ -1,0 +1,2026 @@
+{
+  "scope": "26开发患者重复选择；61历史C自动缓存，非独立测试或板测；H18为fake quant，H19等待后继信息，H13/H14为树头，候选不能当同延迟同实现对照。仅交接历史摘要，不包含全部历史权重。",
+  "experiments": [
+    {
+      "batch": "H1",
+      "method": "frozen same-fold B12 shared features and binary gate; conditional head393-32-3 initialized from same-fold old CNN; hard gate at logitA>=logitN; conditional argmax; no softmax required for class inference",
+      "loss": "conditional abnormal cross entropy; original train mass times inverse sqrt train abnormal class mass; no validation weighting",
+      "selection": "expert full-four-class macro F1; retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123918,
+            862,
+            433,
+            180,
+            604
+          ],
+          [
+            183,
+            1197,
+            121,
+            0,
+            7
+          ],
+          [
+            493,
+            825,
+            14611,
+            244,
+            77
+          ],
+          [
+            71,
+            2,
+            26,
+            59,
+            3
+          ]
+        ],
+        "extra": [
+          443,
+          138,
+          510,
+          1
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.990488218179493,
+          0.3958333333333333,
+          0.9305776702120884,
+          0.12190082644628099
+        ],
+        "recall": [
+          0.9834996071335032,
+          0.7937665782493368,
+          0.8991384615384616,
+          0.36645962732919257
+        ],
+        "f1": [
+          0.9869815415861891,
+          0.528243601059135,
+          0.9145879628180652,
+          0.18294573643410855
+        ],
+        "macro_f1": 0.6531897104743745,
+        "accuracy": 0.9712957558575835
+      },
+      "independent_count_receipt_sha256": null,
+      "protocol_sha256": "e22a639e3677e804a31f06199457f64c4026de1e266185b2cb7de998714ac665"
+    },
+    {
+      "batch": "H2",
+      "method": "frozen same-fold B12 shared features; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class cross entropy; original train mass times inverse sqrt TRAIN four-class mass; no validation weighting",
+      "selection": "expert full-four-class macro F1; retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            122103,
+            2021,
+            399,
+            870,
+            604
+          ],
+          [
+            99,
+            1310,
+            92,
+            0,
+            7
+          ],
+          [
+            662,
+            1511,
+            13604,
+            396,
+            77
+          ],
+          [
+            66,
+            2,
+            22,
+            68,
+            3
+          ]
+        ],
+        "extra": [
+          331,
+          238,
+          519,
+          4
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9906053009467715,
+          0.25777253049980325,
+          0.9294889314020224,
+          0.05082212257100149
+        ],
+        "recall": [
+          0.9690945022500536,
+          0.8687002652519894,
+          0.8371692307692308,
+          0.422360248447205
+        ],
+        "f1": [
+          0.9797318441133284,
+          0.39757207890743557,
+          0.8809169202875089,
+          0.09072715143428953
+        ],
+        "macro_f1": 0.5872369986856405,
+        "accuracy": 0.9525348119736513
+      },
+      "independent_count_receipt_sha256": null,
+      "protocol_sha256": "4b5cb53ff173b320c06110adaa5a853e917cb244c828ecc2d200a9004404c786"
+    },
+    {
+      "batch": "H3",
+      "method": "frozen same-fold B12 shared features; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE + .3 binary teacher KL; train mass inverse sqrt class mass, F multiplier .2; no validation weighting",
+      "selection": "expert mean F1 N/S/V (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            122582,
+            1041,
+            580,
+            1190,
+            604
+          ],
+          [
+            122,
+            1293,
+            86,
+            0,
+            7
+          ],
+          [
+            554,
+            566,
+            14951,
+            102,
+            77
+          ],
+          [
+            70,
+            2,
+            41,
+            45,
+            3
+          ]
+        ],
+        "extra": [
+          401,
+          150,
+          539,
+          2
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9907297399962822,
+          0.42365661861074705,
+          0.9230721738593567,
+          0.033607169529499624
+        ],
+        "recall": [
+          0.9728961800677793,
+          0.8574270557029178,
+          0.9200615384615385,
+          0.2795031055900621
+        ],
+        "f1": [
+          0.9817319782481599,
+          0.5671052631578948,
+          0.9215643973248684,
+          0.06
+        ],
+        "macro_f1": 0.6326004096827308,
+        "accuracy": 0.9649448289279857,
+        "priority_f1": 0.8234672129103077,
+        "priority_min": 0.42365661861074705
+      },
+      "independent_count_receipt_sha256": null,
+      "protocol_sha256": "25612708a82cad9fa479d9dc9dbc16f5fbe451605e5e522fe713ea62fb26c657"
+    },
+    {
+      "batch": "H4",
+      "method": "frozen same-fold B12 shared features; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE + .3 binary teacher KL; natural train mass (no inverse class weight), F multiplier .2; H3 same-fold head warm start; no validation weighting",
+      "selection": "expert mean F1 N/S/V (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123988,
+            728,
+            571,
+            106,
+            604
+          ],
+          [
+            159,
+            1265,
+            77,
+            0,
+            7
+          ],
+          [
+            702,
+            509,
+            14905,
+            57,
+            77
+          ],
+          [
+            73,
+            2,
+            59,
+            24,
+            3
+          ]
+        ],
+        "extra": [
+          413,
+          125,
+          554,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9892528024893286,
+          0.4811715481171548,
+          0.9219967833725102,
+          0.12834224598930483
+        ],
+        "recall": [
+          0.984055175916887,
+          0.8388594164456233,
+          0.9172307692307692,
+          0.14906832298136646
+        ],
+        "f1": [
+          0.9866471440166792,
+          0.6115542663766014,
+          0.9196076011846002,
+          0.13793103448275862
+        ],
+        "macro_f1": 0.6639350115151598,
+        "accuracy": 0.9740543094582951,
+        "priority_f1": 0.8392696705259602,
+        "priority_min": 0.4811715481171548
+      },
+      "independent_count_receipt_sha256": null,
+      "protocol_sha256": "c701ec2a7d07563482ca5b36ab07a8b5c3645265c3f0312aa9dee3f8342a5b4e"
+    },
+    {
+      "batch": "H5",
+      "method": "B12 shared CNN with last residual block fine-tuning; frozen RR/context normalization; fixed B12 train teacher; H4 head start; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE + .3 binary teacher KL; natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; last residual block lr1e-5; no validation weighting",
+      "selection": "expert mean F1 N/S/V (F still reported); retain epoch0; min12 then patience8",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124022,
+            720,
+            554,
+            97,
+            604
+          ],
+          [
+            162,
+            1264,
+            75,
+            0,
+            7
+          ],
+          [
+            717,
+            513,
+            14894,
+            49,
+            77
+          ],
+          [
+            76,
+            2,
+            57,
+            23,
+            3
+          ]
+        ],
+        "extra": [
+          414,
+          125,
+          553,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9890821510315733,
+          0.4817073170731707,
+          0.9232008925804253,
+          0.13609467455621302
+        ],
+        "recall": [
+          0.9843250236116733,
+          0.8381962864721485,
+          0.9165538461538462,
+          0.14285714285714285
+        ],
+        "f1": [
+          0.9866978535172722,
+          0.611810261374637,
+          0.9198653614550845,
+          0.1393939393939394
+        ],
+        "macro_f1": 0.6644418539352333,
+        "accuracy": 0.9742002279107257,
+        "priority_f1": 0.8394578254489978,
+        "priority_min": 0.4817073170731707
+      },
+      "independent_count_receipt_sha256": "5c06a1007837ca301d80e4910baa9175b447b1a4f7e0d084bdca9384a5d3d1d2",
+      "protocol_sha256": "f775c9a7c7ba7b81e4fd3b11897538b954d139a4a939144c9c8f4e76e97806bd"
+    },
+    {
+      "batch": "H6",
+      "method": "frozen same-fold B12 shared features plus raw normalized causal RR3 bypass; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE + .3 binary teacher KL; natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "expert mean F1 N/S/V (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124026,
+            724,
+            547,
+            96,
+            604
+          ],
+          [
+            162,
+            1263,
+            76,
+            0,
+            7
+          ],
+          [
+            725,
+            509,
+            14888,
+            51,
+            77
+          ],
+          [
+            78,
+            2,
+            56,
+            22,
+            3
+          ]
+        ],
+        "extra": [
+          417,
+          119,
+          556,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9889799693799438,
+          0.4826136797860145,
+          0.9234013521056875,
+          0.1301775147928994
+        ],
+        "recall": [
+          0.9843567703992953,
+          0.8375331564986738,
+          0.9161846153846154,
+          0.13664596273291926
+        ],
+        "f1": [
+          0.9866629541974106,
+          0.6123636363636363,
+          0.9197788280357088,
+          0.13333333333333333
+        ],
+        "macro_f1": 0.6630346879825223,
+        "accuracy": 0.9741724339197866,
+        "priority_f1": 0.8396018061989187,
+        "priority_min": 0.4826136797860145
+      },
+      "independent_count_receipt_sha256": "cbae724d3af829d27dced0b93ed2bdb54fda8bc45906a5fea4d9a0284aac7462",
+      "protocol_sha256": "c6eaf94e3d2072122b6622627e94d89b214e5bd444066d55a480c309bd993b22"
+    },
+    {
+      "batch": "H7",
+      "method": "frozen same-fold B12 shared features plus raw normalized causal RR3 bypass; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H6 head start; natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "expert mean F1 N/S/V (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124026,
+            724,
+            547,
+            96,
+            604
+          ],
+          [
+            162,
+            1263,
+            76,
+            0,
+            7
+          ],
+          [
+            725,
+            509,
+            14888,
+            51,
+            77
+          ],
+          [
+            78,
+            2,
+            56,
+            22,
+            3
+          ]
+        ],
+        "extra": [
+          417,
+          119,
+          556,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9889799693799438,
+          0.4826136797860145,
+          0.9234013521056875,
+          0.1301775147928994
+        ],
+        "recall": [
+          0.9843567703992953,
+          0.8375331564986738,
+          0.9161846153846154,
+          0.13664596273291926
+        ],
+        "f1": [
+          0.9866629541974106,
+          0.6123636363636363,
+          0.9197788280357088,
+          0.13333333333333333
+        ],
+        "macro_f1": 0.6630346879825223,
+        "accuracy": 0.9741724339197866,
+        "priority_f1": 0.8396018061989187,
+        "priority_min": 0.4826136797860145
+      },
+      "independent_count_receipt_sha256": null,
+      "protocol_sha256": "e57ddbee737e165fbce2c8bde3f30f11aba829b2d7f131fc991a18e493c17627"
+    },
+    {
+      "batch": "H8",
+      "method": "frozen same-fold B12 shared features plus raw normalized causal RR3 bypass; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "expert mean F1 N/S/V (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124026,
+            724,
+            547,
+            96,
+            604
+          ],
+          [
+            162,
+            1263,
+            76,
+            0,
+            7
+          ],
+          [
+            725,
+            509,
+            14888,
+            51,
+            77
+          ],
+          [
+            78,
+            2,
+            56,
+            22,
+            3
+          ]
+        ],
+        "extra": [
+          417,
+          119,
+          556,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9889799693799438,
+          0.4826136797860145,
+          0.9234013521056875,
+          0.1301775147928994
+        ],
+        "recall": [
+          0.9843567703992953,
+          0.8375331564986738,
+          0.9161846153846154,
+          0.13664596273291926
+        ],
+        "f1": [
+          0.9866629541974106,
+          0.6123636363636363,
+          0.9197788280357088,
+          0.13333333333333333
+        ],
+        "macro_f1": 0.6630346879825223,
+        "accuracy": 0.9741724339197866,
+        "priority_f1": 0.8396018061989187,
+        "priority_min": 0.4826136797860145
+      },
+      "independent_count_receipt_sha256": "b5851ac1bbf00a49a7e7a281868367600ec88a59d07de3b0f824bc2d05ba8e0a",
+      "protocol_sha256": "a5102f7335ffe834d89e5f517abf37c6d9c72d5e922829b77b6928731eafebd1"
+    },
+    {
+      "batch": "H9",
+      "method": "frozen same-fold B12 shared features plus raw normalized causal RR3 bypass; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124148,
+            622,
+            570,
+            53,
+            604
+          ],
+          [
+            189,
+            1225,
+            87,
+            0,
+            7
+          ],
+          [
+            708,
+            446,
+            14971,
+            48,
+            77
+          ],
+          [
+            78,
+            1,
+            56,
+            23,
+            3
+          ]
+        ],
+        "extra": [
+          438,
+          101,
+          553,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.988746505682497,
+          0.511482254697286,
+          0.9220299316376178,
+          0.18548387096774194
+        ],
+        "recall": [
+          0.985325047421764,
+          0.8123342175066313,
+          0.9212923076923077,
+          0.14285714285714285
+        ],
+        "f1": [
+          0.987032811518616,
+          0.6277222649244172,
+          0.9216609720811402,
+          0.16140350877192983
+        ],
+        "macro_f1": 0.6744548893240258,
+        "accuracy": 0.9753397815392312,
+        "priority_f1": 0.8454720161747243,
+        "priority_min": 0.511482254697286
+      },
+      "independent_count_receipt_sha256": "70cc69dd4a6c9faad7976be7ac18fba61260eaf6b15f4635b33b5f77a61babb8",
+      "protocol_sha256": "4111772ce29918330522243a0d351a9f8ab591bcf927962c0268a5a539187436"
+    },
+    {
+      "batch": "H10",
+      "method": "frozen same-fold B12 shared features plus raw normalized causal RR3 bypass; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H9 head start; ALL allowed training INCART beats (remove caps), same MIT and full held validation; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124148,
+            622,
+            570,
+            53,
+            604
+          ],
+          [
+            189,
+            1225,
+            87,
+            0,
+            7
+          ],
+          [
+            708,
+            446,
+            14971,
+            48,
+            77
+          ],
+          [
+            78,
+            1,
+            56,
+            23,
+            3
+          ]
+        ],
+        "extra": [
+          438,
+          101,
+          553,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.988746505682497,
+          0.511482254697286,
+          0.9220299316376178,
+          0.18548387096774194
+        ],
+        "recall": [
+          0.985325047421764,
+          0.8123342175066313,
+          0.9212923076923077,
+          0.14285714285714285
+        ],
+        "f1": [
+          0.987032811518616,
+          0.6277222649244172,
+          0.9216609720811402,
+          0.16140350877192983
+        ],
+        "macro_f1": 0.6744548893240258,
+        "accuracy": 0.9753397815392312,
+        "priority_f1": 0.8454720161747243,
+        "priority_min": 0.511482254697286
+      },
+      "independent_count_receipt_sha256": "65c35ddafa6b16bf27d618149beffdd62959ba63813c76b41dfc28edc1c5cd2e",
+      "protocol_sha256": "34598bac0c4371e3e5236bb9a36e154c05ccab6b462a7ff897341e9efc5504b3"
+    },
+    {
+      "batch": "H11",
+      "method": "frozen same-fold B12 shared features plus raw normalized causal RR3 bypass; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H9 head start; ALL allowed training INCART beats (remove caps), NO MIT in head fitting, pretrained backbone still historically saw MIT; full held validation unchanged; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124148,
+            622,
+            570,
+            53,
+            604
+          ],
+          [
+            189,
+            1225,
+            87,
+            0,
+            7
+          ],
+          [
+            708,
+            446,
+            14971,
+            48,
+            77
+          ],
+          [
+            78,
+            1,
+            56,
+            23,
+            3
+          ]
+        ],
+        "extra": [
+          438,
+          101,
+          553,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.988746505682497,
+          0.511482254697286,
+          0.9220299316376178,
+          0.18548387096774194
+        ],
+        "recall": [
+          0.985325047421764,
+          0.8123342175066313,
+          0.9212923076923077,
+          0.14285714285714285
+        ],
+        "f1": [
+          0.987032811518616,
+          0.6277222649244172,
+          0.9216609720811402,
+          0.16140350877192983
+        ],
+        "macro_f1": 0.6744548893240258,
+        "accuracy": 0.9753397815392312,
+        "priority_f1": 0.8454720161747243,
+        "priority_min": 0.511482254697286
+      },
+      "independent_count_receipt_sha256": "972a1085701833d0c1ff521ece8fe789ef3c241c8817a5350b6385abe2fad370",
+      "protocol_sha256": "2941809946a73aed58902adc049c2a88b964d678a31905b98e967cccaa0425ef"
+    },
+    {
+      "batch": "H12",
+      "method": "B12 shared CNN with ALL convolution blocks fine-tuning; frozen RR/context normalization; fixed B12 train teacher; H4 head start; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE + .3 binary teacher KL; natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; ALL convolution blocks lr1e-5; no validation weighting",
+      "selection": "expert mean F1 N/S/V (F still reported); retain epoch0; min12 then patience8",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124021,
+            723,
+            551,
+            98,
+            604
+          ],
+          [
+            162,
+            1264,
+            75,
+            0,
+            7
+          ],
+          [
+            722,
+            515,
+            14888,
+            48,
+            77
+          ],
+          [
+            76,
+            2,
+            57,
+            23,
+            3
+          ]
+        ],
+        "extra": [
+          414,
+          125,
+          553,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9890426253040392,
+          0.4807911753518448,
+          0.9233440833540064,
+          0.13609467455621302
+        ],
+        "recall": [
+          0.9843170869147678,
+          0.8381962864721485,
+          0.9161846153846154,
+          0.14285714285714285
+        ],
+        "f1": [
+          0.9866741980651732,
+          0.6110708242687938,
+          0.9197504170012974,
+          0.1393939393939394
+        ],
+        "macro_f1": 0.664222344682301,
+        "accuracy": 0.9741515884265822,
+        "priority_f1": 0.8391651464450881,
+        "priority_min": 0.4807911753518448
+      },
+      "independent_count_receipt_sha256": "4a1740b44030c8addfc02f1e05598cf693e7cf07a33d7620656033921f19dbdb",
+      "protocol_sha256": "30e1906adfeb89677034b4dfc29ce3d00d2c736ed481ac0faf0b53f1c9f07660"
+    },
+    {
+      "batch": "H13",
+      "method": "B12 frozen shared CNN393 + normalized causal RR3 + eight fixed morphology -> four-class histogram gradient boosting; CNN convolution remains necessary; PC only, not PL",
+      "loss": null,
+      "selection": null,
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123781,
+            848,
+            728,
+            36,
+            604
+          ],
+          [
+            871,
+            452,
+            178,
+            0,
+            7
+          ],
+          [
+            902,
+            213,
+            15019,
+            39,
+            77
+          ],
+          [
+            72,
+            1,
+            65,
+            20,
+            3
+          ]
+        ],
+        "extra": [
+          516,
+          13,
+          563,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9812829985254713,
+          0.2960052390307793,
+          0.9073279768017882,
+          0.21052631578947367
+        ],
+        "recall": [
+          0.9824122796574521,
+          0.29973474801061006,
+          0.9242461538461538,
+          0.12422360248447205
+        ],
+        "f1": [
+          0.9818473143781804,
+          0.29785831960461284,
+          0.9157089290613664,
+          0.15624999999999997
+        ],
+        "macro_f1": 0.5879161407610399,
+        "accuracy": 0.9677311765196365,
+        "priority_f1": 0.7318048543480532,
+        "priority_min": 0.2960052390307793
+      },
+      "independent_count_receipt_sha256": "e7c5939e6f1aba78d7e35ff51bfb3da434ea1d7dca4d9fb017b5ef6268a063b0",
+      "protocol_sha256": "3451473294f18d6ac3002da984fdcb23283c05357c9c86de7130ae07aee56ed8"
+    },
+    {
+      "batch": "H14",
+      "method": "B12 frozen shared CNN393 + normalized causal RR3 + eight fixed morphology -> four-class histogram gradient boosting; CNN convolution remains necessary; PC only, not PL",
+      "loss": null,
+      "selection": null,
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            122998,
+            1561,
+            763,
+            71,
+            604
+          ],
+          [
+            334,
+            992,
+            175,
+            0,
+            7
+          ],
+          [
+            682,
+            273,
+            15121,
+            97,
+            77
+          ],
+          [
+            54,
+            1,
+            57,
+            46,
+            3
+          ]
+        ],
+        "extra": [
+          424,
+          57,
+          611,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9879992288661119,
+          0.34396671289875175,
+          0.9039875650146469,
+          0.21495327102803738
+        ],
+        "recall": [
+          0.9761978459804599,
+          0.6578249336870027,
+          0.9305230769230769,
+          0.2857142857142857
+        ],
+        "f1": [
+          0.9820630846065097,
+          0.4517304189435337,
+          0.9170634078296994,
+          0.2453333333333333
+        ],
+        "macro_f1": 0.6490475611782691,
+        "accuracy": 0.9669320992801357,
+        "priority_f1": 0.7836189704599144,
+        "priority_min": 0.34396671289875175
+      },
+      "independent_count_receipt_sha256": "5ed3b55b3cd41247a02342d4c9e59c23cba2ddc6adbb057cd04071734d04dc23",
+      "protocol_sha256": "725d98134fe8f2c1f45e9143a233dc907f1b72ad195e6706ae835c3c6769fb9d"
+    },
+    {
+      "batch": "H15",
+      "method": "B12 frozen shared CNN393 + normalized causal RR3 + eight fixed morphology + causal relative122 (no next RR) -> four-class histogram gradient boosting; CNN convolution remains necessary; PC only, not PL",
+      "loss": null,
+      "selection": null,
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123319,
+            1453,
+            571,
+            50,
+            604
+          ],
+          [
+            286,
+            1033,
+            182,
+            0,
+            7
+          ],
+          [
+            741,
+            241,
+            15097,
+            94,
+            77
+          ],
+          [
+            56,
+            1,
+            61,
+            40,
+            3
+          ]
+        ],
+        "extra": [
+          404,
+          63,
+          625,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9880855087095172,
+          0.370118237190971,
+          0.9129777455249153,
+          0.21739130434782608
+        ],
+        "recall": [
+          0.9787455256871196,
+          0.6850132625994695,
+          0.9290461538461539,
+          0.2484472049689441
+        ],
+        "f1": [
+          0.9833933405900249,
+          0.48057687834380086,
+          0.9209418654303666,
+          0.2318840579710145
+        ],
+        "macro_f1": 0.6541990355838018,
+        "accuracy": 0.9692390005280859,
+        "priority_f1": 0.7949706947880641,
+        "priority_min": 0.370118237190971
+      },
+      "independent_count_receipt_sha256": "0c9cbe4b84c3c6044f03c253eaad2019d93aba0f15f431a0172f1bfc5e5dafeb",
+      "protocol_sha256": "cdb758b062b52bc7be0ca6aca3633e9d2104a11f271b8dd98246229424ee2d7c"
+    },
+    {
+      "batch": "H16",
+      "method": "ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123669,
+            761,
+            951,
+            12,
+            604
+          ],
+          [
+            189,
+            1236,
+            76,
+            0,
+            7
+          ],
+          [
+            806,
+            429,
+            14889,
+            49,
+            77
+          ],
+          [
+            74,
+            1,
+            60,
+            23,
+            3
+          ]
+        ],
+        "extra": [
+          453,
+          97,
+          542,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9878425765430422,
+          0.4896988906497623,
+          0.9013803123864874,
+          0.27380952380952384
+        ],
+        "recall": [
+          0.9815233696040382,
+          0.8196286472148541,
+          0.9162461538461538,
+          0.14285714285714285
+        ],
+        "f1": [
+          0.9846728346895551,
+          0.6130952380952381,
+          0.90875244140625,
+          0.18775510204081633
+        ],
+        "macro_f1": 0.6735689040579649,
+        "accuracy": 0.9715181077850968,
+        "priority_f1": 0.8355068380636811,
+        "priority_min": 0.4896988906497623
+      },
+      "independent_count_receipt_sha256": "c2dc0256b167a0ca98435e7417e1b58bd22d7aca1a24f11caa328a9fc73135ff",
+      "protocol_sha256": "6721e6706812450a961d6b9189a4d46ec7fdedb3804a8d7e03e2cace889c7eb1"
+    },
+    {
+      "batch": "H17",
+      "method": "H16 same-fold head start, last block lr1e-5/head1e-4; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min12 then patience8",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123669,
+            761,
+            951,
+            12,
+            604
+          ],
+          [
+            189,
+            1236,
+            76,
+            0,
+            7
+          ],
+          [
+            806,
+            429,
+            14889,
+            49,
+            77
+          ],
+          [
+            74,
+            1,
+            60,
+            23,
+            3
+          ]
+        ],
+        "extra": [
+          453,
+          97,
+          542,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9878425765430422,
+          0.4896988906497623,
+          0.9013803123864874,
+          0.27380952380952384
+        ],
+        "recall": [
+          0.9815233696040382,
+          0.8196286472148541,
+          0.9162461538461538,
+          0.14285714285714285
+        ],
+        "f1": [
+          0.9846728346895551,
+          0.6130952380952381,
+          0.90875244140625,
+          0.18775510204081633
+        ],
+        "macro_f1": 0.6735689040579649,
+        "accuracy": 0.9715181077850968,
+        "priority_f1": 0.8355068380636811,
+        "priority_min": 0.4896988906497623
+      },
+      "independent_count_receipt_sha256": "cdba13b8f438713c2661d2d4c70e70425cdf1b3c3dd1d04adb59092e56703dad",
+      "protocol_sha256": "592d3589c51b1babebf3ed445bf3be86683bdea04c25520a4ed85bdeccc5c4bc"
+    },
+    {
+      "batch": "H18",
+      "method": "Fixed integer trunk activations; QAT head uses exact half-away rounding STE, frozen layer scales; no dropout; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123925,
+            768,
+            681,
+            19,
+            604
+          ],
+          [
+            190,
+            1233,
+            78,
+            0,
+            7
+          ],
+          [
+            813,
+            481,
+            14820,
+            59,
+            77
+          ],
+          [
+            74,
+            1,
+            61,
+            22,
+            3
+          ]
+        ],
+        "extra": [
+          456,
+          103,
+          533,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9877807712541249,
+          0.4767981438515081,
+          0.9163420515674272,
+          0.22
+        ],
+        "recall": [
+          0.9835551640118415,
+          0.8176392572944297,
+          0.912,
+          0.13664596273291926
+        ],
+        "f1": [
+          0.9856634387862641,
+          0.6023448949682462,
+          0.9141658699071646,
+          0.1685823754789272
+        ],
+        "macro_f1": 0.6676891447851505,
+        "accuracy": 0.9727896828705633,
+        "priority_f1": 0.8340580678872249,
+        "priority_min": 0.4767981438515081
+      },
+      "independent_count_receipt_sha256": null,
+      "protocol_sha256": "7ae419b6df8a1b76dc2ce6d6eb30b613b87fcba5bec0e585b919077b5c71d969"
+    },
+    {
+      "batch": "H19",
+      "method": "Delayed classification, maximum R+2.5sec next event REPORT wait, missing extra zeros; same-fold H16 start; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123666,
+            765,
+            948,
+            14,
+            604
+          ],
+          [
+            201,
+            1224,
+            76,
+            0,
+            7
+          ],
+          [
+            779,
+            390,
+            14953,
+            51,
+            77
+          ],
+          [
+            74,
+            1,
+            61,
+            22,
+            3
+          ]
+        ],
+        "extra": [
+          470,
+          93,
+          529,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9878265037143542,
+          0.49494541043267287,
+          0.9025774129293174,
+          0.25287356321839083
+        ],
+        "recall": [
+          0.9814995595133218,
+          0.8116710875331565,
+          0.9201846153846154,
+          0.13664596273291926
+        ],
+        "f1": [
+          0.9846528681818724,
+          0.6149208741522231,
+          0.9112959746472865,
+          0.1774193548387097
+        ],
+        "macro_f1": 0.6720722679550228,
+        "accuracy": 0.9718516356763668,
+        "priority_f1": 0.8369565723271273,
+        "priority_min": 0.49494541043267287
+      },
+      "independent_count_receipt_sha256": "6d2788e405fd46d22887bcb0c1bec367904b1360799e5367de6143723d8e0467",
+      "protocol_sha256": "7ac57a729cb069912673391c7a9c1a0a6bff0cecf9bee049cc942cbc2203bfb5"
+    },
+    {
+      "batch": "H20",
+      "method": "H16 baseline plus trainable pre-R local two-channel CNN branch on indices8:40 (not validated P-wave detector), 64 extra learned features; ONE MAIN CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123669,
+            763,
+            946,
+            15,
+            604
+          ],
+          [
+            205,
+            1220,
+            76,
+            0,
+            7
+          ],
+          [
+            791,
+            401,
+            14930,
+            51,
+            77
+          ],
+          [
+            72,
+            1,
+            62,
+            23,
+            3
+          ]
+        ],
+        "extra": [
+          469,
+          87,
+          536,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9877242304681885,
+          0.4935275080906149,
+          0.9021148036253777,
+          0.25842696629213485
+        ],
+        "recall": [
+          0.9815233696040382,
+          0.8090185676392573,
+          0.9187692307692308,
+          0.14285714285714285
+        ],
+        "f1": [
+          0.9846140372527398,
+          0.6130653266331658,
+          0.9103658536585366,
+          0.184
+        ],
+        "macro_f1": 0.6730113043861106,
+        "accuracy": 0.9716918202284666,
+        "priority_f1": 0.836015072514814,
+        "priority_min": 0.4935275080906149
+      },
+      "independent_count_receipt_sha256": "8d966183cfa6c41b899af1429f254c93762dbde5046f167b8e56c7b8b02f134b",
+      "protocol_sha256": "76196c27a12061a4f181633e524e2597b95fbd6c74be336c9d3cf5bc7b5a8f13"
+    },
+    {
+      "batch": "H21",
+      "method": "B12 shared CNN with ALL convolution blocks fine-tuning; frozen RR/context normalization; fixed B12 train teacher; H4 head start; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE + .3 binary teacher KL; train mass times inverse sqrt TRAIN class mass; all convolution blocks receive minority gradients, F multiplier .2; H4 same-fold head warm start; ALL convolution blocks lr1e-5; no validation weighting",
+      "selection": "expert mean F1 N/S/V (F still reported); retain epoch0; min12 then patience8",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123988,
+            728,
+            571,
+            106,
+            604
+          ],
+          [
+            159,
+            1265,
+            77,
+            0,
+            7
+          ],
+          [
+            702,
+            509,
+            14905,
+            57,
+            77
+          ],
+          [
+            73,
+            2,
+            59,
+            24,
+            3
+          ]
+        ],
+        "extra": [
+          413,
+          125,
+          554,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9892528024893286,
+          0.4811715481171548,
+          0.9219967833725102,
+          0.12834224598930483
+        ],
+        "recall": [
+          0.984055175916887,
+          0.8388594164456233,
+          0.9172307692307692,
+          0.14906832298136646
+        ],
+        "f1": [
+          0.9866471440166792,
+          0.6115542663766014,
+          0.9196076011846002,
+          0.13793103448275862
+        ],
+        "macro_f1": 0.6639350115151598,
+        "accuracy": 0.9740543094582951,
+        "priority_f1": 0.8392696705259602,
+        "priority_min": 0.4811715481171548
+      },
+      "independent_count_receipt_sha256": "28322b2b5537b4dfb9cbe29181f75a86faa0d5845cadeb41f6bc2b69a1441bea",
+      "protocol_sha256": "27e227e7a2efb23a20950e2fc81891d53083a1025d5a8e15c061b94acf0f902a"
+    },
+    {
+      "batch": "H22",
+      "method": "H16 same-fold head start, TRAIN-only v92 HGB teacher KL .3 on N/S/(V+F), original four-class CE; no future teacher input to student inference; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123874,
+            810,
+            699,
+            10,
+            604
+          ],
+          [
+            188,
+            1256,
+            57,
+            0,
+            7
+          ],
+          [
+            639,
+            412,
+            15073,
+            49,
+            77
+          ],
+          [
+            72,
+            1,
+            61,
+            24,
+            3
+          ]
+        ],
+        "extra": [
+          430,
+          115,
+          547,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9893852383728824,
+          0.48419429452582885,
+          0.9170164871935268,
+          0.2891566265060241
+        ],
+        "recall": [
+          0.983150392469662,
+          0.8328912466843501,
+          0.9275692307692308,
+          0.14906832298136646
+        ],
+        "f1": [
+          0.9862579617834395,
+          0.6123842028278889,
+          0.9222626732340075,
+          0.19672131147540983
+        ],
+        "macro_f1": 0.6794065373301865,
+        "accuracy": 0.9743669918563607,
+        "priority_f1": 0.840301612615112,
+        "priority_min": 0.48419429452582885
+      },
+      "independent_count_receipt_sha256": "38fe360fe9e199797bc38fd82928802cbb548ccf0f4fa22a83eaf9619842bb19",
+      "protocol_sha256": "3c1509ad9b77b1cf3869090a4cfab1a7cea1a55f64680b2e128df87c85f6524d"
+    },
+    {
+      "batch": "H23",
+      "method": "H22 same-fold head start, TRAIN HGB teacher .3 KL N/S/(V+F) plus four-class CE; last block lr1e-5/head1e-4; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min12 then patience8",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123874,
+            810,
+            699,
+            10,
+            604
+          ],
+          [
+            188,
+            1256,
+            57,
+            0,
+            7
+          ],
+          [
+            639,
+            412,
+            15073,
+            49,
+            77
+          ],
+          [
+            72,
+            1,
+            61,
+            24,
+            3
+          ]
+        ],
+        "extra": [
+          430,
+          115,
+          547,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9893852383728824,
+          0.48419429452582885,
+          0.9170164871935268,
+          0.2891566265060241
+        ],
+        "recall": [
+          0.983150392469662,
+          0.8328912466843501,
+          0.9275692307692308,
+          0.14906832298136646
+        ],
+        "f1": [
+          0.9862579617834395,
+          0.6123842028278889,
+          0.9222626732340075,
+          0.19672131147540983
+        ],
+        "macro_f1": 0.6794065373301865,
+        "accuracy": 0.9743669918563607,
+        "priority_f1": 0.840301612615112,
+        "priority_min": 0.48419429452582885
+      },
+      "independent_count_receipt_sha256": "44994be1405880c412025c4d26254815a2b1644934e14a24ff664c296fa3e103",
+      "protocol_sha256": "4cfbe722579ac4f8460f24217196a9a9164c08639be4d4d9d736387f71b1cc16"
+    },
+    {
+      "batch": "H24",
+      "method": "H22 same-fold head start, TRAIN HGB teacher .3 KL N/S/(V+F) plus four-class CE; ALL convolution blocks lr1e-5/head1e-4; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min12 then patience8",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            123895,
+            792,
+            696,
+            10,
+            604
+          ],
+          [
+            195,
+            1249,
+            57,
+            0,
+            7
+          ],
+          [
+            661,
+            411,
+            15052,
+            49,
+            77
+          ],
+          [
+            71,
+            1,
+            62,
+            24,
+            3
+          ]
+        ],
+        "extra": [
+          434,
+          112,
+          546,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9891342530497541,
+          0.48693957115009745,
+          0.9170779260342411,
+          0.2891566265060241
+        ],
+        "recall": [
+          0.9833170631046771,
+          0.8282493368700266,
+          0.9262769230769231,
+          0.14906832298136646
+        ],
+        "f1": [
+          0.9862170799950647,
+          0.613307144610852,
+          0.9216544714202615,
+          0.19672131147540983
+        ],
+        "macro_f1": 0.679475001875397,
+        "accuracy": 0.9743183523722171,
+        "priority_f1": 0.8403928986753927,
+        "priority_min": 0.48693957115009745
+      },
+      "independent_count_receipt_sha256": "cfe904d22ee56b4fcab71d01e5689cc46ef71d1795932cac66bd1b751c1e6b41",
+      "protocol_sha256": "611819e20c5d124cb5cccd0c2765af3ecf2efc6fdbed6e76d55ddd7898411a37"
+    },
+    {
+      "batch": "H25",
+      "method": "H22 head start plus past8 causal RR sequence normalized by preceding32 median, 269 head input; H16 same-fold head start, TRAIN-only v92 HGB teacher KL .3 on N/S/(V+F), original four-class CE; no future teacher input to student inference; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124052,
+            815,
+            515,
+            11,
+            604
+          ],
+          [
+            188,
+            1259,
+            54,
+            0,
+            7
+          ],
+          [
+            601,
+            387,
+            15136,
+            49,
+            77
+          ],
+          [
+            70,
+            1,
+            61,
+            26,
+            3
+          ]
+        ],
+        "extra": [
+          414,
+          118,
+          560,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9898424097346898,
+          0.487984496124031,
+          0.9271101310792601,
+          0.3023255813953488
+        ],
+        "recall": [
+          0.9845631245188378,
+          0.8348806366047745,
+          0.9314461538461538,
+          0.16149068322981366
+        ],
+        "f1": [
+          0.9871957090903304,
+          0.6159491193737769,
+          0.9292730844793712,
+          0.21052631578947367
+        ],
+        "macro_f1": 0.685736057183238,
+        "accuracy": 0.9760763222991189,
+        "priority_f1": 0.8441393043144929,
+        "priority_min": 0.487984496124031
+      },
+      "independent_count_receipt_sha256": "579c9983b284bb0b0562ead7441e813722bc4d4658ea08c147d80b70aff33b76",
+      "protocol_sha256": "80d4054d54bddbf9a318e55f816332679fabdce80f882166be326ee6ef390cfe"
+    },
+    {
+      "batch": "H26",
+      "method": "H25 same-fold start, hidden width32 to64 only; extra first-layer units random, extra output weights zero, baseline exact; H22 head start plus past8 causal RR sequence normalized by preceding32 median, 269 head input; H16 same-fold head start, TRAIN-only v92 HGB teacher KL .3 on N/S/(V+F), original four-class CE; no future teacher input to student inference; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124065,
+            801,
+            516,
+            11,
+            604
+          ],
+          [
+            188,
+            1257,
+            56,
+            0,
+            7
+          ],
+          [
+            589,
+            322,
+            15213,
+            49,
+            77
+          ],
+          [
+            70,
+            1,
+            63,
+            24,
+            3
+          ]
+        ],
+        "extra": [
+          412,
+          110,
+          570,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9899540391305736,
+          0.504616619831393,
+          0.9266049457912048,
+          0.2857142857142857
+        ],
+        "recall": [
+          0.984666301578609,
+          0.833554376657825,
+          0.9361846153846154,
+          0.14906832298136646
+        ],
+        "f1": [
+          0.9873030904699568,
+          0.6286571642910728,
+          0.9313701481572181,
+          0.19591836734693877
+        ],
+        "macro_f1": 0.6858121925662967,
+        "accuracy": 0.9766738931043109,
+        "priority_f1": 0.8491101343060826,
+        "priority_min": 0.504616619831393
+      },
+      "independent_count_receipt_sha256": "ff424cb17cdfaf66ae2f26e968b473293bd9c3acdfe6ef416b76b679fbd51000",
+      "protocol_sha256": "09dc6ae6d08f40927da6960f80b6d594ea211f1adb736fe30eabbd1df03babc5"
+    },
+    {
+      "batch": "H27",
+      "method": "H26 same-fold start; focal CE gamma2 no alpha, original train mass and HGB KL.3 unchanged; reference arxiv1708.02002, not copied results; H25 same-fold start, hidden width32 to64 only; extra first-layer units random, extra output weights zero, baseline exact; H22 head start plus past8 causal RR sequence normalized by preceding32 median, 269 head input; H16 same-fold head start, TRAIN-only v92 HGB teacher KL .3 on N/S/(V+F), original four-class CE; no future teacher input to student inference; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+      "loss": "four-class CE only, binary teacher KL removed (0); same-fold H7 head start; eight deterministic morphology descriptors (current/history width energy correlation slope); natural train mass (no inverse class weight), F multiplier .2; H4 same-fold head warm start; append original normalized RR3 bypassing frozen RR ReLU; no validation weighting",
+      "selection": "complete automatic mean F1 N/S/V, includes missing and extras (F still reported); retain epoch0; min20 then patience12",
+      "completed": true,
+      "automatic": {
+        "confusion": [
+          [
+            124053,
+            811,
+            518,
+            11,
+            604
+          ],
+          [
+            183,
+            1262,
+            56,
+            0,
+            7
+          ],
+          [
+            538,
+            323,
+            15260,
+            52,
+            77
+          ],
+          [
+            65,
+            1,
+            65,
+            27,
+            3
+          ]
+        ],
+        "extra": [
+          411,
+          109,
+          572,
+          0
+        ],
+        "support": [
+          125997,
+          1508,
+          16250,
+          161
+        ],
+        "precision": [
+          0.9904431137724551,
+          0.5035913806863528,
+          0.926476838079048,
+          0.3
+        ],
+        "recall": [
+          0.9845710612157432,
+          0.8368700265251989,
+          0.939076923076923,
+          0.16770186335403728
+        ],
+        "f1": [
+          0.9874983581893514,
+          0.6287992027902342,
+          0.9327343296354024,
+          0.2151394422310757
+        ],
+        "macro_f1": 0.6910428332115158,
+        "accuracy": 0.9769726785069068,
+        "priority_f1": 0.8496772968716626,
+        "priority_min": 0.5035913806863528
+      },
+      "independent_count_receipt_sha256": "85c253dc22e205f3ded88af341d05cce633002416806d95c787990968411dd91",
+      "protocol_sha256": "b8d582e3fd416b5449e397917ba674762ea2c5276029b0cc0d3fdefde4dd8ddd"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "weights": [
+    {
+      "fold": 0,
+      "path": "assets/fold_0.pt",
+      "sha256": "16d56a6b1065df35f3e11c4cc285055b421978bd451d5da1b72df8f1744fcfc7",
+      "original_head_sha256": "e5f5d93c5da4ecb326430be3f11b361dd775ccd2795ebb34ae4294b45f86e880",
+      "fit": {
+        "best_epoch": 0,
+        "completed_epochs": 20,
+        "seconds": 20.10900000000038,
+        "weights_sha256": "e5f5d93c5da4ecb326430be3f11b361dd775ccd2795ebb34ae4294b45f86e880"
+      }
+    },
+    {
+      "fold": 1,
+      "path": "assets/fold_1.pt",
+      "sha256": "8f5d316d3dda43422224f6bea17b8199f4523e58384190e85b60b6f3be57dc19",
+      "original_head_sha256": "88fe52574edfa9bcda421e8e7a93d0e8e66da0eafa8c06f0305f8e60a822e630",
+      "fit": {
+        "best_epoch": 0,
+        "completed_epochs": 20,
+        "seconds": 16.921000000000276,
+        "weights_sha256": "88fe52574edfa9bcda421e8e7a93d0e8e66da0eafa8c06f0305f8e60a822e630"
+      }
+    },
+    {
+      "fold": 2,
+      "path": "assets/fold_2.pt",
+      "sha256": "10c2006df93ad36ef1d26688c4075711899dc72bae28f2c8819c70395f838fb1",
+      "original_head_sha256": "e9922e704914d74775283725469e748138c55eb6e039590ecc61d8e84e9aeedd",
+      "fit": {
+        "best_epoch": 7,
+        "completed_epochs": 20,
+        "seconds": 19.89099999999962,
+        "weights_sha256": "e9922e704914d74775283725469e748138c55eb6e039590ecc61d8e84e9aeedd"
+      }
+    }
+  ],
+  "source_scripts": {
+    "tmp/four_cnn_h27_20261102/run.py": "74f9ddce260c259d6fc383a6ddc5a715add45f5f5495b840ef379a77664e937c",
+    "tmp/four_cnn_h27_independent_counts_20261102.json": "85c253dc22e205f3ded88af341d05cce633002416806d95c787990968411dd91"
+  },
+  "teacher_preflight_sha256": "a7f4dfdd1c2e15b60677d0803390072076265c4f79e3fdad6f7e305f0707046f",
+  "teacher_scope": "Historical H27 used TRAIN-only HGB soft targets; derived target caches are local only, NOT included or required for handoff/reference training",
+  "test_loaded": false
+}

@@ -43,7 +43,7 @@ export default function Analyze() {
     return () => {active = false;};
   }, [id]);
 
-  async function submitFile(file: File, rate: number) {
+  async function submitFile(file: File, rate: number, model: string) {
     setBusy(true);
     setProgress(0);
     setSubmitError('');
@@ -51,6 +51,7 @@ export default function Analyze() {
       const body = new FormData();
       body.append('file', file);
       body.append('sample_rate_hz', String(rate));
+      body.append('model_type', model);
       const next = await uploadWithProgress<AnalysisTask>('/analyze/ecg', body, setProgress);
       setProgress(100);
       setSearch({task: next.id});
@@ -128,7 +129,7 @@ export default function Analyze() {
   return <section>
     <p className="eyebrow">记录与分析</p>
     <h1>新建记录</h1>
-    <UploadForm onSubmit={(file, rate) => void submitFile(file, rate)}
+    <UploadForm onSubmit={(file, rate, model) => void submitFile(file, rate, model)}
                 onReplay={() => void replay()} busy={busy} progress={progress} error={submitError} />
   </section>;
 }

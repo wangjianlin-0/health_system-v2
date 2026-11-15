@@ -12,6 +12,9 @@ def load_classifier(model_type: str = 'none', model_path: str = '') -> Classifie
     if model_type == 'openecg':
         from ai_model.inference.openecg_adapter import OpenEcgClassifier
         return OpenEcgClassifier()
+    if model_type in ('cnn', 'hgb'):
+        from ai_model.inference.edge_adapter import EdgeClassifier
+        return EdgeClassifier(model_type)
     raise ValueError(f'不支持的分类器: {model_type}')
 
 

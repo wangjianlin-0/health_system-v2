@@ -19,9 +19,14 @@ class NoteUpdate(BaseModel):
     note: str = Field(default='', max_length=500)
 
 
+class ReanalysisOptions(BaseModel):
+    model_type: str | None = Field(default=None, pattern='^(cnn|hgb|openecg|none)$')
+
+
 @router.post('/analyze/ecg', status_code=202)
 async def upload(response: Response, file: UploadFile = File(...),
                  sample_rate_hz: float = Form(...), user: str = Depends(current_user),
+                 model_type: str | None = Form(default=None),
                  idempotency_key: str | None = Header(default=None, alias='Idempotency-Key')):
     if not file.filename or not file.filename.lower().endswith('.csv'):
         raise ValueError('首版仅支持单列 CSV；WFDB/EDF 解析待信号模块扩展')
@@ -33,6 +38,10 @@ async def upload(response: Response, file: UploadFile = File(...),
     except UnicodeDecodeError:
         raise ValueError('CSV 请使用 UTF-8 编码')
     signal = parse_csv(text, sample_rate_hz)
+    if model_type is not None:
+        if model_type not in ('cnn', 'hgb', 'openecg', 'none'):
+            raise ValueError('模型须为cnn、hgb、openecg或none')
+        signal['model_type'] = model_type
     task, created = records.submit_task(user, signal, idempotency_key=idempotency_key)
     if created:
         records.store_raw_input(user, task['id'], content)
@@ -100,8 +109,8 @@ def access_log(identifier: str, action: str | None = None,
 
 
 @router.post('/records/{identifier}/reanalyze', status_code=202)
-def reanalyze(identifier: str, user: str = Depends(current_user)):
-    task = records.reanalyze(user, identifier)
+def reanalyze(identifier: str, body: ReanalysisOptions | None = None, user: str = Depends(current_user)):
+    task = records.reanalyze(user, identifier, model_type=body.model_type if body else None)
     runner.enqueue(task['id'])
     return task
 

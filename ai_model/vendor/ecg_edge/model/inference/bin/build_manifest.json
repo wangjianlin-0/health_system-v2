@@ -1,0 +1,44 @@
+[
+  {
+    "name": "detector500",
+    "sha256": "d55b436d89391db27c9f4b9048bc535b9a5d27042074a5d84d1f5b50f637afff",
+    "command": [
+      "x86_64-w64-mingw32-gcc.exe",
+      "-std=c11",
+      "-O2",
+      "-ffp-contract=off",
+      "-static-libgcc",
+      "-Inative",
+      "native/pipeline500.c",
+      "native/rate500.c",
+      "native/classification.c",
+      "native/runtime500_bridge.c",
+      "native/detector_host.c",
+      "-lm",
+      "-o",
+      "bin/detector500.exe"
+    ],
+    "warnings": "",
+    "public_copy_note": "编译记录中的本机绝对路径已换为模块内相对路径；程序和编译参数未改变，未重新构建。",
+    "source_metadata_sha256": "c291ee29d8b2e0bb75844408fd3a544c14322e85547db3ba3c8679c1fc3e7ffb"
+  },
+  {
+    "name": "recut500",
+    "sha256": "188897780ed7c27c871d928abf3b934e4934909fc777e68a4263585c569d4363",
+    "command": [
+      "x86_64-w64-mingw32-gcc.exe",
+      "-std=c11",
+      "-O2",
+      "-ffp-contract=off",
+      "-static-libgcc",
+      "-Inative",
+      "native/recut_host.c",
+      "-lm",
+      "-o",
+      "bin/recut500.exe"
+    ],
+    "warnings": "",
+    "public_copy_note": "编译记录中的本机绝对路径已换为模块内相对路径；程序和编译参数未改变，未重新构建。",
+    "source_metadata_sha256": "c291ee29d8b2e0bb75844408fd3a544c14322e85547db3ba3c8679c1fc3e7ffb"
+  }
+]

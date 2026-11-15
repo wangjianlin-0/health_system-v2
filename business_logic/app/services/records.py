@@ -767,7 +767,7 @@ def update_note(user: str, identifier: str, note: str):
     return detail(user, identifier)
 
 
-def reanalyze(user: str, identifier: str) -> dict:
+def reanalyze(user: str, identifier: str, *, model_type: str | None = None) -> dict:
     row = _visible_record_row(user, identifier, owner_only=True)
     if not row:
         raise RecordNotFound("记录不存在或没有重分析权限")
@@ -781,7 +781,12 @@ def reanalyze(user: str, identifier: str) -> dict:
         _audit(db, identifier, user, "reanalyze")
     if not task or not task["payload"]:
         raise InputUnavailable("原始输入已清理，无法重分析")
-    new_task = submit(user, json.loads(task["payload"]), source_record_id=identifier)
+    signal = json.loads(task["payload"])
+    if model_type is not None:
+        if model_type not in ('cnn', 'hgb', 'openecg', 'none'):
+            raise ValidationError('不支持的模型')
+        signal['model_type'] = model_type
+    new_task = submit(user, signal, source_record_id=identifier)
     source_path = task["input_path"]
     if source_path and Path(source_path).is_file():
         target = (settings.upload_dir / user / f"{new_task['id']}.csv").resolve()

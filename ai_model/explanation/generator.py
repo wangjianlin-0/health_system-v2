@@ -91,6 +91,17 @@ def _template(payload: dict[str, Any]) -> dict[str, Any]:
         return result
 
     heart_rate_text = _heart_rate_text(payload)
+    if payload['classification'].get('task_type') == 'beat_level' and classification:
+        result = {
+            'summary': f'本次逐拍分类：{classification}。{heart_rate_text}。',
+            'elderly_summary': f'本次记录已完成心拍分类：{classification}。请保存记录作为复核参考。',
+            'professional_interpretation': 'CNN为N/S/V/F四类；HGB为N/S/VF三类。N类不代表健康，VF是V/E/F合并，不是心室颤动。',
+            'risk_level': 'needs_review', 'advice': '结果用于课程研究，请结合原始波形复核。',
+            'next_steps': ['保存本次记录。', '有不适时请由专业人员复核。'],
+            'measurement_guidance': [], 'reassurance': '模型类别是辅助信息，不能直接作出疾病诊断。',
+        }
+        result.update(_common_fields(labels, limitations))
+        return result
     if classification == 'normal':
         result = {
             'summary': f'这次记录看起来比较平稳，{heart_rate_text}。先不用过度紧张。',

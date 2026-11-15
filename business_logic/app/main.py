@@ -34,6 +34,8 @@ async def lifespan(app):
     try:
         yield
     finally:
+        from hardware.realtime import acquisition
+        acquisition.shutdown()
         runner.stop()
 
 

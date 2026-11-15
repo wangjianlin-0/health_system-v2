@@ -1,0 +1,44 @@
+{
+  "passed": true,
+  "phase": "解压预验收；最终ZIP还将复核",
+  "extracted_files": 50,
+  "outside_cwd": "outside_repository",
+  "isolated_python": true,
+  "PYTHONPATH_removed": true,
+  "check": {
+    "passed": true,
+    "models": 3,
+    "synthetic_samples": 30000,
+    "synthetic_events": 73,
+    "synthetic_classified": 72,
+    "features": 192,
+    "maximum_feature_difference": 0,
+    "feature_vectors": 160,
+    "fits": 0,
+    "training_libraries_loaded": [],
+    "rebuilt_native": false,
+    "qualified": false
+  },
+  "cli": {
+    "samples": 30000,
+    "events": 73,
+    "classified": 72,
+    "clipped_samples": 0,
+    "features": 192,
+    "fold": 0,
+    "preprocess": "hp05",
+    "fits": 0,
+    "qualified": false,
+    "output": "output/beats.csv"
+  },
+  "adapter": {
+    "passed": true,
+    "events": 73,
+    "json_serializable": true,
+    "qualified": false
+  },
+  "fits": 0,
+  "second_computer_tested": false,
+  "public_copy_note": "公开副本仅替换本机工作目录及输出绝对路径；原始指标不变，原件留本地。",
+  "source_sha256": "0a8f32d3ee8b1eb6a3320b37ad15f9b572152f88e64486e9342ea1de01b8c8ce"
+}

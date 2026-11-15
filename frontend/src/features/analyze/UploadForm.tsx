@@ -3,7 +3,7 @@ import { DragEvent, FormEvent, useState } from 'react';
 const MAX_BYTES = 2_000_000;
 
 export default function UploadForm({onSubmit, onReplay, busy, progress, error}: {
-  onSubmit: (file: File, rate: number) => void;
+  onSubmit: (file: File, rate: number, model: string) => void;
   onReplay: () => void;
   busy: boolean;
   progress: number;
@@ -11,6 +11,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [rate, setRate] = useState(500);
+  const [model, setModel] = useState('cnn');
   const [localError, setLocalError] = useState('');
   const [dragging, setDragging] = useState(false);
 
@@ -35,7 +36,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
       return;
     }
     setLocalError('');
-    onSubmit(file, rate);
+    onSubmit(file, rate, model);
   }
 
   function drop(event: DragEvent<HTMLDivElement>) {
@@ -61,6 +62,12 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
              onChange={event => setRate(Number(event.target.value))} />
     </label>
     <small className="hint">示例：仓库 csv/ptbxl_00001_lead_II_500Hz_10s.csv 为 500 Hz、10 秒。</small>
+    <label>分析模型<select value={model} onChange={event => setModel(event.target.value)}>
+      <option value="cnn">CNN H27 · 四类 N/S/V/F（500 Hz）</option>
+      <option value="hgb">HGB v92 · 三类 N/S/VF（500 Hz）</option>
+      <option value="openecg">OpenECG · 可选依赖（500 Hz，至少 10 秒）</option>
+      <option value="none">仅信号检查</option>
+    </select></label>
     {progress > 0 && progress < 100 && <div className="progress" role="progressbar" aria-valuenow={progress}
           aria-valuemin={0} aria-valuemax={100}><span style={{width: `${progress}%`}} /></div>}
     {(localError || error) && <p className="notice notice-error" role="alert">{localError || error}</p>}

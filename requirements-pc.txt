@@ -1,0 +1,4 @@
+# CPU inference: install PyTorch from its CPU index, then this file.
+# python -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu
+-r requirements-dev.txt
+torch==2.9.1

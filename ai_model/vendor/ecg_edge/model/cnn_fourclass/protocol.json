@@ -1,0 +1,99 @@
+{
+  "version": "H27_portable_handoff_v2",
+  "classes": [
+    "N",
+    "S",
+    "V",
+    "F"
+  ],
+  "label_symbols": {
+    "N": [
+      "N",
+      "L",
+      "R",
+      "j",
+      "e"
+    ],
+    "S": [
+      "a",
+      "J",
+      "A",
+      "S"
+    ],
+    "V": [
+      "V",
+      "E"
+    ],
+    "F": [
+      "F"
+    ]
+  },
+  "folds": [
+    [
+      "incart:9",
+      "incart:21",
+      "incart:26",
+      "incart:6",
+      "incart:29",
+      "incart:11",
+      "incart:24",
+      "incart:30",
+      "incart:14"
+    ],
+    [
+      "incart:28",
+      "incart:15",
+      "incart:1",
+      "incart:25",
+      "incart:5",
+      "incart:16",
+      "incart:19",
+      "incart:13",
+      "incart:12"
+    ],
+    [
+      "incart:17",
+      "incart:18",
+      "incart:20",
+      "incart:7",
+      "incart:4",
+      "incart:3",
+      "incart:27",
+      "incart:2"
+    ]
+  ],
+  "excluded": [
+    "incart:10",
+    "incart:22",
+    "incart:23",
+    "incart:31",
+    "incart:32",
+    "incart:8"
+  ],
+  "train_sampling": {
+    "seed": 2026101706,
+    "per_verified_subject_per_class": [
+      500,
+      1500,
+      1500,
+      1500
+    ],
+    "svdb_per_record_per_class": [
+      200,
+      300,
+      300,
+      300
+    ],
+    "selection": "deterministic hash smallest; train-only cap, never validation/test; SVDB record unit is not a verified subject"
+  },
+  "source_protocol_sha256": "b8d582e3fd416b5449e397917ba674762ea2c5276029b0cc0d3fdefde4dd8ddd",
+  "source_method": "H26 same-fold start; focal CE gamma2 no alpha, original train mass and HGB KL.3 unchanged; reference arxiv1708.02002, not copied results; H25 same-fold start, hidden width32 to64 only; extra first-layer units random, extra output weights zero, baseline exact; H22 head start plus past8 causal RR sequence normalized by preceding32 median, 269 head input; H16 same-fold head start, TRAIN-only v92 HGB teacher KL .3 on N/S/(V+F), original four-class CE; no future teacher input to student inference; ONE CNN pass raw waveform128+frozen RR8+normalized RR3+causal relative122 ->261-32-4; no aligned/background CNN passes or morphology8; direct head393-32-4 initialized from same-fold old CNN; four-class argmax, no hard binary gate; B12 binary head retained only for audit, removable from deployment",
+  "origin_commit": "5fa3f3e64b575b492a1d859a2e207c6b1c8d555b",
+  "input": "wave128 normalized + rr3 + completed median background128/count + pastRR8; 269 head features",
+  "validation": "26 development patients OOF; not independent test",
+  "scope": "H27 pure CNN four-class, training-only HGB KL3, no teacher/future input at inference",
+  "target": "prioritize N/S/V precision recall F1 toward95%; F reported; not achieved",
+  "int8": "H27_NOT_VALIDATED",
+  "hardware": false,
+  "continuation_reference": "H27 complete weights start; focal gamma2, no HGB teacher, head-only finite baseline; teammate may redesign; preserve patient-separated evaluation"
+}
