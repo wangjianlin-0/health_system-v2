@@ -25,9 +25,12 @@
 | GET | /records/{id}/export?format=csv\|json\|raw | 仅本人导出 | 记录模块 |
 | DELETE | /records/{id} | 仅本人删除 | 记录模块 |
 | GET | /analyze/{id} | 同一记录结果的兼容入口 | 记录模块 |
-| GET/POST | /family/grants | 查询授权/JSON username 直接授权查看 | 账户模块 |
+| GET/POST | /family/grants | 查询发出的邀请及授权/JSON username 发送邀请，等待接收方确认 | 账户模块 |
 | DELETE | /family/grants/{id} | 撤回本人发出的授权 | 账户模块 |
-| GET | /family/notifications | 有效授权关联的站内授权提示 | 账户模块 |
+| GET | /family/invitations | 查询收到的邀请与共享关系 | 账户模块 |
+| POST | /family/invitations/{id}/respond | JSON accept: true/false，接受或拒绝邀请 | 账户模块 |
+| DELETE | /family/invitations/{id} | 接收方退出已接受的共享 | 账户模块 |
+| GET | /family/notifications | 待确认邀请与有效授权关联的站内通知 | 账户模块 |
 
 ## 错误语义
 
@@ -94,4 +97,4 @@
 
 WebSocket `/api/v1/ws/realtime` 尚未实现，主动关闭，不发送模拟分析。
 
-通知仅为站内授权提示，状态 in_app_available 不代表外部渠道投递或急救警报。授权原型为本人直接共享，不包含接收方确认；家属导出权限待团队确认，当前默认拒绝。审计查询接口、软删除与保留策略、备份恢复接口为后续阶段。
+通知在站内显示，状态为 in_app_available。新邀请由接收方明确接受后才开放只读记录权限；7 天未处理为 expired。接收方可拒绝或退出共享，发起方可撤回邀请或授权。同一双方不能重复创建 pending/accepted 关系；拒绝、过期或撤回后可以重新邀请。升级前的有效授权保持可用。家属不能导出、删除、修改备注或重新分析记录。

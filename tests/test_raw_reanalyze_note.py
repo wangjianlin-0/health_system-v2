@@ -60,6 +60,7 @@ def test_waveform_window_and_shared_permission(client):
     assert client.get(path, headers=relative).status_code == 404
     grant = client.post('/api/v1/family/grants', json={'username': 'wave-relative'},
                         headers=owner).json()
+    assert client.post('/api/v1/family/invitations/' + grant['id'] + '/respond', json={'accept': True}, headers=relative).status_code == 200
     assert client.get(path + '?max_points=100', headers=relative).status_code == 200
     client.delete('/api/v1/family/grants/' + grant['id'], headers=owner)
     assert client.get(path, headers=relative).status_code == 404
@@ -105,6 +106,7 @@ def test_reanalyze_creates_new_record_and_keeps_old(client):
 
     grant = client.post('/api/v1/family/grants', json={'username': 're-relative'},
                         headers=owner).json()
+    assert client.post('/api/v1/family/invitations/' + grant['id'] + '/respond', json={'accept': True}, headers=relative).status_code == 200
     assert client.post(f'/api/v1/records/{original["id"]}/reanalyze',
                        headers=relative).status_code == 404
     client.delete('/api/v1/family/grants/' + grant['id'], headers=owner)
@@ -133,6 +135,7 @@ def test_note_patch_permissions_and_export(client):
 
     grant = client.post('/api/v1/family/grants', json={'username': 'note-relative'},
                         headers=owner).json()
+    assert client.post('/api/v1/family/invitations/' + grant['id'] + '/respond', json={'accept': True}, headers=relative).status_code == 200
     assert client.patch(f'/api/v1/records/{record["id"]}',
                         json={'note': 'nope'}, headers=relative).status_code == 404
     client.delete('/api/v1/family/grants/' + grant['id'], headers=owner)

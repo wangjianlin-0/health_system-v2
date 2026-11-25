@@ -1,5 +1,5 @@
 param(
-    [string]$Python = 'E:\Environments\Python\pytorch\Scripts\python.exe',
+    [string]$Python = (Join-Path $PSScriptRoot '.venv\Scripts\python.exe'),
     [int]$Port = 8000
 )
 $ErrorActionPreference = 'Stop'

@@ -108,14 +108,9 @@ export default function Monitor() {
     </div>
     <div className="wave-toolbar"><strong>最近 5 秒</strong>
       <label className="inline"><input type="checkbox" checked={raw} onChange={e => setRaw(e.target.checked)} />原始波形</label>
-      <span className="hint">{raw ? '标称 mV 原始信号' : '0.5–40 Hz 因果滤波，仅用于显示'}</span>
     </div>
     <Waveform points={points} duration={duration} offset={start} unit="mV" />
-    <p className="hint">波形持续更新；心拍分类约每 4 秒重算本轮完整记录，在线结果至少滞后 2.5 秒，停止后再做整段分析。
-      刷新或切换页面不会停止采集。最多 200000 点（约 6 分 40 秒）。</p>
     {session?.prediction?.status === 'model_unavailable' && <p className="notice notice-error">{session.prediction.explanation}</p>}
     {!session?.prediction && <p className="empty-state">采集至少 4 秒后，可查看心率预览；保存后在记录详情查看完整分类。</p>}
-    <p className="hint">通道 2 为心电，通道 1 原始数据一并保存。无线帧没有序号和校验，无法证明源端无丢样；
-      遇到断流或帧错误会停止，重连后请开启新会话。标称电压换算采用 2.42 V、6 倍增益。</p>
   </section>;
 }

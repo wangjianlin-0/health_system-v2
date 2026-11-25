@@ -29,7 +29,18 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const prediction = result.prediction;
   const quality = result.quality;
   const detail = prediction.explanation_detail;
+  const elderlySummary = detail?.elderly_summary?.replace(
+    '这些结果用于辅助参考，不能单独作为诊断；异常心拍较多或伴有不适时，建议保存记录并请专业人员复核。',
+    '',
+  );
   const beatAnalysis = result.beat_analysis;
+  const beatClasses = [
+    {code: 'N', label: '正常类心拍', key: 'normal'},
+    {code: 'S', label: '室上性异位心拍', key: 'pac'},
+    {code: 'V', label: '室性异位心拍', key: 'pvc'},
+    {code: 'F', label: '融合心拍', key: 'fusion'},
+  ];
+  const hasBeatClassification = beatAnalysis?.status === 'classified';
   const rhythmAnalysis = result.rhythm_analysis;
   const rateAnalysis = result.rate_analysis;
   const respirationAnalysis = result.respiration_analysis;
@@ -257,7 +268,6 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
           <ul>{quality.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
         {quality.guidance && quality.guidance.length > 0 &&
           <ul className="quality-guidance">{quality.guidance.map(item => <li key={item}>{item}</li>)}</ul>}
-        <p className="hint">{quality.scope}</p>
         {quality.reasons?.length > 0 && <ul>{quality.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
       </section>
       <section>
@@ -280,22 +290,31 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       </section>
     </div>
 
-    {(beatAnalysis || rhythmAnalysis || rateAnalysis || respirationAnalysis || safety) &&
+    {beatAnalysis && <section className="beat-classification-panel" aria-label="心拍分类 NSVF">
+      <p className="eyebrow">独立指标 · 心拍分类</p>
+      <div className="beat-classification-heading">
+        <h2>心拍分类 · N / S / V / F</h2>
+        <span className="hint">共检测 {beatAnalysis.total} 个心拍</span>
+      </div>
+      <dl className="beat-classification-grid">
+        {beatClasses.map(item => <div key={item.code}>
+          <dt><span className="beat-class-code">{item.code}</span>{item.label}</dt>
+          <dd>{hasBeatClassification ? beatAnalysis.counts[item.key] ?? 0 : '—'}<span>个</span></dd>
+        </div>)}
+      </dl>
+      {!hasBeatClassification && <p className="hint">本次未获得 NSVF 分类结果。</p>}
+    </section>}
+
+    {(rhythmAnalysis || rateAnalysis || respirationAnalysis || safety) &&
       <section className="multimodel-panel">
         <p className="eyebrow">多模型联合分析</p>
-        <h2>OpenECG 节律 + CNN/HGB 心拍</h2>
+        <h2>节律、心率与呼吸</h2>
         <div className="analysis-card-grid">
           {rhythmAnalysis && <article className="analysis-card">
             <span className="analysis-kicker">整段节律 · OpenECG</span>
             <strong>{rhythmAnalysis.primary}</strong>
             <p>置信度：{rhythmAnalysis.confidence == null ? '—' : `${(rhythmAnalysis.confidence * 100).toFixed(0)}%`}</p>
             <p>模型：{rhythmAnalysis.model_version ?? '—'}</p>
-          </article>}
-          {beatAnalysis && <article className="analysis-card">
-            <span className="analysis-kicker">逐心拍 · {beatAnalysis.source}</span>
-            <strong>{beatAnalysis.total} 个心拍</strong>
-            <p>N {beatAnalysis.counts.normal ?? 0} · S {beatAnalysis.counts.pac ?? 0} · V {beatAnalysis.counts.pvc ?? 0} · F {beatAnalysis.counts.fusion ?? 0}</p>
-            <p>状态：{beatAnalysis.status}</p>
           </article>}
           {rateAnalysis && <article className="analysis-card">
             <span className="analysis-kicker">心率与 RR</span>
@@ -312,10 +331,10 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
           {safety && <article className={`analysis-card safety-${safety.level}`}>
             <span className="analysis-kicker">固定安全规则</span>
             <strong>{safety.level}</strong>
-            <p>{safety.message}</p>
+            {!['本次结果可作为参考；如有不适仍应咨询专业人员。',
+              '建议保存记录并结合症状咨询专业人员。'].includes(safety.message) && <p>{safety.message}</p>}
           </article>}
         </div>
-        {beatAnalysis?.limitations?.map(item => <p className="hint" key={item}>{item}</p>)}
       </section>}
     {modelMissing && <div className="notice notice-info">
       <strong>本次只完成了信号检查，没有做 AI 分类。</strong>
@@ -332,13 +351,12 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
 
     {detail && !modelMissing && <section className="explanation">
       <h2>解读</h2>
-      {detail.elderly_summary && <div className="plain-summary">
-        <span>先看结论</span><p>{detail.elderly_summary}</p>
+      {elderlySummary && <div className="plain-summary">
+        <span>先看结论</span><p>{elderlySummary}</p>
       </div>}
       {detail.professional_interpretation && <><h3>专业解释</h3><p>{detail.professional_interpretation}</p></>}
       {detail.condition_education?.length ? <div className="condition-education">
         <h3>异常相关知识</h3>
-        <p className="hint">以下是一般医学科普，不表示本次记录已经证明相应症状或病因。</p>
         {detail.condition_education.map(item => <article key={item.condition}>
           <h4>{item.condition}</h4><p>{item.what_it_means}</p>
           <strong>可能伴随的感受</strong><ul>{item.possible_symptoms.map(value => <li key={value}>{value}</li>)}</ul>
@@ -347,7 +365,6 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
         </article>)}
       </div> : null}
       {detail.evidence?.length ? <><h3>分析依据</h3><ul>{detail.evidence.map(item => <li key={item}>{item}</li>)}</ul></> : null}
-      {detail.uncertainty?.length ? <><h3>不确定说明</h3><ul>{detail.uncertainty.map(item => <li key={item}>{item}</li>)}</ul></> : null}
       {detail.next_steps?.length ? <><h3>下一步建议</h3><ul>{detail.next_steps.map(item => <li key={item}>{item}</li>)}</ul></> : null}
       {detail.provider && <small>解释引擎：{detail.provider === 'deepseek' ? 'DeepSeek 大模型' : '本地模板'}</small>}
     </section>}
@@ -367,8 +384,5 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       <p>{record.note}</p>
     </section> : null}
 
-    <footer className="disclaimer">
-      本页为课程研究用途的辅助记录，不构成医疗诊断。分析结果与处理版本：{dash(record.processing_version)}。
-    </footer>
   </article>;
 }

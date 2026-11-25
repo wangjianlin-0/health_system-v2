@@ -48,6 +48,8 @@ def test_full_record_grant_revoke(client):
     path = '/api/v1/records/' + identifier
     assert client.get(path, headers=relative).status_code == 404
     grant = client.post('/api/v1/family/grants', json={'username': 'relative'}, headers=owner).json()
+    assert client.get(path, headers=relative).status_code == 404
+    assert client.post('/api/v1/family/invitations/' + grant['id'] + '/respond', json={'accept': True}, headers=relative).status_code == 200
     assert client.get(path, headers=relative).status_code == 200
     assert len(client.get('/api/v1/records?shared=true', headers=relative).json()) == 1
     shared = client.get('/api/v1/records?shared=true&page=1&page_size=10', headers=relative).json()
@@ -83,11 +85,11 @@ def test_upload_bad_signal_and_validation(client):
     assert bad_task['error_code'] == 'input_invalid'
     assert '非有限值' in bad_task['error']
 
-    assert upload('time,value\n0,0.1\n').status_code == 400
+    assert upload('time,unknown_signal\n0,0.1\n').status_code == 400
     assert upload('1\n', name='signal.dat').status_code == 400
     bad_rate = upload('1\n', rate='0')
     assert wait_task(client, headers, bad_rate.json()['id'])['status'] == 'failed'
-    assert upload('1' * 2_000_001).status_code == 413
+    assert upload('1' * 5_000_001).status_code == 413
 
     identifier = flat_record['id']
     storage.initialize()
@@ -214,6 +216,7 @@ def test_history_pagination_trends_export_and_owner_delete(client):
                       headers=owner).json()['id'] == record_id
     grant = client.post('/api/v1/family/grants', json={'username': 'history-relative'},
                         headers=owner).json()
+    assert client.post('/api/v1/family/invitations/' + grant['id'] + '/respond', json={'accept': True}, headers=relative).status_code == 200
     assert client.get(f'/api/v1/records/{record_id}', headers=relative).status_code == 200
     assert client.get(f'/api/v1/records/{record_id}/export', headers=relative).status_code == 404
     assert client.delete(f'/api/v1/records/{record_id}', headers=relative).status_code == 404

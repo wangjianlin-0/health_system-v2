@@ -76,6 +76,7 @@ def test_access_log_query_filters_and_permissions(client):
 
     grant = client.post('/api/v1/family/grants', json={'username': 'log-relative'},
                         headers=owner).json()
+    assert client.post('/api/v1/family/invitations/' + grant['id'] + '/respond', json={'accept': True}, headers=relative).status_code == 200
     assert client.get(f'{path}/access-log', headers=relative).status_code == 404
     client.delete('/api/v1/family/grants/' + grant['id'], headers=owner)
 

@@ -13,6 +13,20 @@ def test_unknown_scale_and_missing_samples():
     with pytest.raises(ValueError): parse_csv('ecg_filtered\n100\n',500)
     with pytest.raises(ValueError): parse_csv('timestamp(s),ecg_raw\n0,8388608\n0.004,8388608',500)
 
+def test_calibrated_record_export_uses_value_column_and_validates_metadata():
+    text = (
+        'timestamp_sec,value,sample_rate_hz,unit,source\n'
+        '0.0,-0.25,500.0,mV,ads1292r_bluetooth\n'
+        '0.002,-0.20,500.0,mV,ads1292r_bluetooth\n'
+    )
+    parsed = parse_csv(text, 500)
+    assert parsed['samples'] == [-0.25, -0.2]
+    assert parsed['source'] == 'csv_export'
+    with pytest.raises(ValueError, match='采样率'):
+        parse_csv(text.replace('500.0,mV', '250.0,mV'), 500)
+    with pytest.raises(ValueError, match='单位'):
+        parse_csv(text.replace('500.0,mV', '500.0,ADC'), 500)
+
 def test_filter_preserves_model_input_and_attenuates_mains():
     t=np.arange(10000)/500
     values=20+np.sin(2*np.pi*5*t)+.5*np.sin(2*np.pi*50*t)

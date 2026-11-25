@@ -61,7 +61,7 @@ def load(env=None) -> Settings:
     return Settings(
         db_path=db_path,
         upload_dir=upload_dir,
-        max_upload_bytes=_int(env, 'ECG_MAX_UPLOAD_BYTES', 2_000_000, 1_000, 50_000_000),
+        max_upload_bytes=_int(env, 'ECG_MAX_UPLOAD_BYTES', 5_000_000, 1_000, 50_000_000),
         max_samples=_int(env, 'ECG_MAX_SAMPLES', 200_000, 2, 2_000_000),
         task_workers=_int(env, 'ECG_TASK_WORKERS', 1, 1, 8),
         task_lease_seconds=_int(env, 'ECG_TASK_LEASE_SECONDS', 120, 10, 86_400),

@@ -25,4 +25,4 @@
 
 以[根 README](../README.md)为准：账户模块维护身份/家庭；记录模块维护上传、记录与存储；硬件模块维护采集；信号模块维护解析和标准信号；模型模块维护分析入口和分类。协议修改需对应模块作者共同联调。
 
-api_contract 与 data_schema 描述当前接口；hardware_protocol 为待确认草案。未实现的异步任务、导出删除、邀请确认不能按现有接口使用。
+api_contract 与 data_schema 描述当前接口；hardware_protocol 为待确认草案。异步任务、导出删除与家庭邀请确认接口以 api_contract 中的当前约定为准。

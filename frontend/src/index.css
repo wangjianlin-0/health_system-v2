@@ -50,6 +50,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 .result-grid h2{margin:0 0 8px}
 .explanation{background:#f7fbf9;border-radius:12px;padding:18px 20px;margin:18px 0}
 .explanation h3{margin:16px 0 6px;font-size:15px}
+.family-grant-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 0;border-bottom:1px solid #e1eae7}.family-grant-row .badge{margin-left:12px}.family-grant-row .actions{margin:0}.family-page h2{margin-top:28px}
 .elderly{font-size:16px;color:#183e48}
 .disclaimer{margin-top:22px;padding-top:14px;border-top:1px solid #e1eae7;font-size:12px;color:#698580}
 .filter-bar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:14px 0 20px}
@@ -92,3 +93,5 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 @media(max-width:900px){.analysis-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.analysis-card-grid{grid-template-columns:1fr}}
 @media(max-width:760px){.stat-grid{grid-template-columns:repeat(2,1fr)}.result-grid{grid-template-columns:1fr}.record-row{grid-template-columns:1fr 1fr;gap:8px}.record-actions{grid-column:1/-1;justify-content:flex-start}.record-main{grid-column:1/-1}}
+
+.beat-classification-panel{border-top:4px solid #147b74}.beat-classification-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}.beat-classification-heading h2{margin:0}.beat-classification-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}.beat-classification-grid>div{padding:16px;background:#f2f7f5;border:1px solid #d8e7e4;border-radius:12px}.beat-classification-grid dt{display:flex;flex-direction:column;gap:8px;color:#526e74;font-size:13px}.beat-class-code{font-size:20px;font-weight:700;color:#147b74}.beat-classification-grid dd{margin:12px 0 0;font-size:30px;font-variant-numeric:tabular-nums;color:#173f48}.beat-classification-grid dd span{margin-left:8px;font-size:12px;color:#698580}@media(max-width:620px){.beat-classification-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

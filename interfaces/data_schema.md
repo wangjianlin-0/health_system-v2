@@ -40,6 +40,8 @@ Record：`id`、`created_at`、`task_id`、`task_status`、`result`，列表/详
 
 记录 owner_id 与会话 user_id 关联；共享查询必须匹配有效授权（`grants.active=1`）。撤回限制后续查询，不能抹除已被查看或下载的副本。导出与删除仅限本人；共享视图只读。
 
+家庭关系 `grants` 增加 `status`、`created_at`、`expires_at`。status 为 pending/accepted/declined/revoked/expired；仅 accepted 时 active=1。created_at/expires_at 使用 Unix 秒，邀请有效期为 7 天。升级前已有授权按 active 值迁移为 accepted 或 revoked。确认、拒绝、撤回、退出均由服务器校验对应用户身份。
+
 删除在同一事务清理 `task_inputs`、`analysis_tasks`、`task_events`（外键级联）、`record_signals` 与记录，事务提交后删除原件文件；若其他记录或任务通过 `supersedes_record_id`/`source_record_id` 指向它，会先置空这些字段再删除。`record_access_log` 保留动作元数据（记录 ID、操作者、动作、时间），不保存波形或备注内容。
 
 ## 访问审计

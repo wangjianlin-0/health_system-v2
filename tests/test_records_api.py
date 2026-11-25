@@ -85,6 +85,7 @@ def test_shared_only_read(client):
     record = create_record(client, owner)
     grant = client.post('/api/v1/family/grants', json={'username': 'share-relative'},
                         headers=owner).json()
+    assert client.post('/api/v1/family/invitations/' + grant['id'] + '/respond', json={'accept': True}, headers=relative).status_code == 200
     shared = client.get('/api/v1/records?shared=true&page=1&page_size=5', headers=relative).json()
     assert shared['total'] == 1
     assert shared['items'][0]['owner_username'] == 'share-owner'
@@ -133,7 +134,7 @@ def test_health_reports_database_and_limits(client):
     assert body['database']['writable'] is True
     assert body['database']['schema_version'] >= 3
     assert body['model']['type'] == 'none'
-    assert body['capabilities']['max_upload_bytes'] == 2_000_000
+    assert body['capabilities']['max_upload_bytes'] == 5_000_000
     assert body['tasks']['mode'] == 'inprocess'
     assert isinstance(body['tasks']['pending'], int)
 

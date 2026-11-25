@@ -39,26 +39,76 @@ def logout(token):
     return {'message': '已退出'}
 
 def grants(owner):
+    _expire()
     with connect() as db:
-        return [dict(r) for r in db.execute('SELECT g.id,u.username,g.active FROM grants g JOIN users u ON u.id=g.relative_id WHERE g.owner_id=?', (owner,))]
+        return [dict(r) for r in db.execute('SELECT g.id,u.username,g.active,g.status,g.created_at,g.expires_at FROM grants g JOIN users u ON u.id=g.relative_id WHERE g.owner_id=? ORDER BY g.created_at DESC', (owner,))]
+
+
+def _expire():
+    with connect() as db:
+        db.execute("UPDATE grants SET status='expired' WHERE status='pending' AND expires_at<=?", (time.time(),))
+
+
+def invitations(user):
+    _expire()
+    with connect() as db:
+        return [dict(r) for r in db.execute(
+            'SELECT g.id,u.username,g.active,g.status,g.created_at,g.expires_at '
+            'FROM grants g JOIN users u ON u.id=g.owner_id WHERE g.relative_id=? '
+            'ORDER BY g.created_at DESC', (user,))]
+
+
+def respond(user, identifier, accept):
+    _expire()
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        row = db.execute('SELECT * FROM grants WHERE id=? AND relative_id=?', (identifier, user)).fetchone()
+        if not row:
+            raise LookupError('邀请不存在')
+        if row['status'] != 'pending' or row['expires_at'] <= time.time():
+            raise ValueError('邀请已处理、撤回或过期')
+        db.execute('UPDATE grants SET active=?,status=? WHERE id=?',
+                   (int(accept), 'accepted' if accept else 'declined', identifier))
+    return {'message': '已接受邀请，可以查看共享记录' if accept else '已拒绝邀请'}
+
+
+def leave(user, identifier):
+    with connect() as db:
+        row = db.execute('UPDATE grants SET active=0,status=\'revoked\' WHERE id=? AND relative_id=? AND active=1',
+                         (identifier, user))
+        if not row.rowcount:
+            raise LookupError('共享关系不存在')
+    return {'message': '已退出共享'}
 
 def grant(owner, username):
+    _expire()
     with connect() as db:
-        relative = db.execute('SELECT id FROM users WHERE username=?', (username,)).fetchone()
+        # Serialize the duplicate check with the insert, including concurrent requests.
+        db.execute('BEGIN IMMEDIATE')
+        relative = db.execute('SELECT id FROM users WHERE username=?', (username.strip(),)).fetchone()
         if not relative or relative['id'] == owner:
             raise ValueError('请输入其他已注册用户的用户名')
         identifier = secrets.token_hex(12)
-        db.execute('INSERT INTO grants VALUES (?,?,?,1)', (identifier, owner, relative['id']))
-        db.execute('INSERT INTO notifications VALUES (?,?,?,?,?)', (secrets.token_hex(12), relative['id'], identifier, '一位用户已向你开放记录查看权限', 'in_app_available'))
-    return {'id': identifier, 'message': '授权已建立；仅开放记录查看'}
+        if db.execute("SELECT 1 FROM grants WHERE owner_id=? AND relative_id=? AND status IN ('pending','accepted')",
+                      (owner, relative['id'])).fetchone():
+            raise ValueError('已存在待确认邀请或有效授权')
+        db.execute('INSERT INTO grants(id,owner_id,relative_id,active,status,created_at,expires_at) VALUES (?,?,?,0,\'pending\',?,?)',
+                   (identifier, owner, relative['id'], time.time(), time.time()+7*86400))
+        name = db.execute('SELECT username FROM users WHERE id=?', (owner,)).fetchone()['username']
+        db.execute('INSERT INTO notifications VALUES (?,?,?,?,?)', (secrets.token_hex(12), relative['id'], identifier, f'{name} 邀请你查看其心电记录，请在家庭协同页面确认', 'in_app_available'))
+    return {'id': identifier, 'status': 'pending', 'message': '邀请已发送，等待对方确认'}
 
 def revoke(owner, identifier):
     with connect() as db:
-        cursor = db.execute('UPDATE grants SET active=0 WHERE id=? AND owner_id=?', (identifier, owner))
+        cursor = db.execute("UPDATE grants SET active=0,status='revoked' WHERE id=? AND owner_id=?", (identifier, owner))
         if not cursor.rowcount:
             raise LookupError('授权不存在')
     return {'message': '授权已撤回'}
 
 def notifications(user):
+    _expire()
     with connect() as db:
-        return [dict(r) for r in db.execute('SELECT n.id,n.message,n.status FROM notifications n JOIN grants g ON g.id=n.grant_id WHERE n.recipient_id=? AND g.active=1', (user,))]
+        return [dict(r) for r in db.execute(
+            "SELECT n.id,CASE WHEN g.status='accepted' THEN u.username || ' 已与你共享心电记录' ELSE n.message END AS message,n.status "
+            "FROM notifications n JOIN grants g ON g.id=n.grant_id JOIN users u ON u.id=g.owner_id "
+            "WHERE n.recipient_id=? AND g.status IN ('pending','accepted') ORDER BY g.created_at DESC", (user,))]

@@ -1,6 +1,6 @@
 import { DragEvent, FormEvent, useState } from 'react';
 
-const MAX_BYTES = 2_000_000;
+const MAX_BYTES = 5_000_000;
 
 export default function UploadForm({onSubmit, onReplay, busy, progress, error}: {
   onSubmit: (file: File, rate: number, model: string) => void;
@@ -23,7 +23,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
       return;
     }
     if (next.size > MAX_BYTES) {
-      setLocalError('CSV 最大 2 MB');
+      setLocalError('CSV 最大 5 MB');
       return;
     }
     setFile(next);
@@ -46,7 +46,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
   }
 
   return <form onSubmit={submit}>
-    <p>支持单列 mV CSV（value/sample/mv 表头），或包含 ecg_raw 的 ADS1292R 原始 CSV，系统按 2.42 V、6 倍增益换算。默认采样率为 500 Hz；其他设备请按实际采样率修改。</p>
+    <p>支持单列 mV CSV（value/sample/mv 表头）、包含 value 列的系统记录导出 CSV，或包含 ecg_raw 的 ADS1292R 原始 CSV（按 2.42 V、6 倍增益换算）。默认采样率为 500 Hz；其他设备请按实际采样率修改。</p>
     <div className={`dropzone${dragging ? ' dragging' : ''}`}
          onDragOver={event => {event.preventDefault(); setDragging(true);}}
          onDragLeave={() => setDragging(false)}
@@ -54,7 +54,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
       <input id="ecg-file" type="file" accept=".csv" onChange={event => pick(event.target.files?.[0] ?? null)} />
       <label htmlFor="ecg-file" className="dropzone-label">
         <strong>{file ? file.name : '点击选择或拖入 CSV'}</strong>
-        <span>{file ? `${(file.size / 1024).toFixed(1)} KB` : 'mV 或 ADS1292R 原始 CSV · UTF-8 · ≤2 MB'}</span>
+        <span>{file ? `${(file.size / 1024).toFixed(1)} KB` : 'mV 或 ADS1292R 原始 CSV · UTF-8 · ≤5 MB'}</span>
       </label>
     </div>
     <label>采样率 Hz

@@ -71,6 +71,42 @@ def parse_csv(text, sample_rate_hz):
         return result
     if 'ecg_filtered' in header:
         raise ValueError('ecg_filtered 单位未知，请提供 ecg_raw 或已转换的单列 mV')
+    # Records exported by this application contain a calibrated `value` column
+    # alongside timestamp and metadata columns. Use only the ECG values, while
+    # checking that the export's declared units and sampling rate are usable.
+    if 'value' in header:
+        value_col = header.index('value')
+        timestamp_col = header.index('timestamp_sec') if 'timestamp_sec' in header else None
+        rate_col = header.index('sample_rate_hz') if 'sample_rate_hz' in header else None
+        unit_col = header.index('unit') if 'unit' in header else None
+        values = []
+        timestamps = []
+        for row in rows[1:]:
+            if not row or all(not cell.strip() for cell in row):
+                continue
+            try:
+                values.append(float(row[value_col]))
+                if timestamp_col is not None:
+                    timestamps.append(float(row[timestamp_col]))
+                if rate_col is not None and row[rate_col].strip():
+                    declared_rate = float(row[rate_col])
+                    if not math.isclose(declared_rate, float(sample_rate_hz), rel_tol=1e-6):
+                        raise ValueError('CSV 内的采样率与填写的采样率不一致')
+                if unit_col is not None and row[unit_col].strip().lower() != 'mv':
+                    raise ValueError('value 列单位不是 mV，不能按 mV 信号导入')
+            except (ValueError, IndexError) as exc:
+                if str(exc).startswith('CSV 内') or str(exc).startswith('value 列'):
+                    raise
+                raise ValueError('CSV 的 value 列或相关元数据无效') from exc
+        if timestamps:
+            rate = float(sample_rate_hz)
+            if not all(math.isfinite(t) for t in timestamps) or any(
+                abs((b-a)-1/rate) > max(1e-6, .01/rate)
+                for a,b in zip(timestamps, timestamps[1:])
+            ):
+                raise ValueError('时间戳不连续或与指定采样率不匹配，不自动补点')
+        return {'samples': values, 'sample_rate_hz': sample_rate_hz, 'unit': 'mV',
+                'lead': 'user_single_lead', 'source': 'csv_export'}
     values = []
     for index, row in enumerate(rows):
         if not row or not row[0].strip():

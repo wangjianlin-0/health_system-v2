@@ -200,7 +200,11 @@ export interface AnalysisTask {
   record?: RecordDetail | null;
 }
 export interface TaskPage {items: AnalysisTask[]; page: number; page_size: number; total: number; pages: number;}
-export interface Grant {id: string; username: string; active: number;}
+export interface Grant {
+  id: string; username: string; active: number;
+  status: 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired';
+  created_at: number; expires_at: number | null;
+}
 export interface Notification {id: string; message: string; status: string;}
 
 export class ApiError extends Error {
