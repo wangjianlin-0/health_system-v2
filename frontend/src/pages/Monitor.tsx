@@ -24,6 +24,7 @@ export default function Monitor() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [raw, setRaw] = useState(false);
+  const [windowSeconds, setWindowSeconds] = useState(5);
   const [connected, setConnected] = useState(false);
   const [reload, setReload] = useState(0);
   const action = useRef(false);
@@ -59,28 +60,34 @@ export default function Monitor() {
     finally {action.current = false; setBusy(false); setReload(value => value + 1);}
   }
 
-  const points = (session?.points ?? []).map(p => ({t: p.t, v: raw ? p.raw : p.v}));
-  const start = points[0]?.t ?? 0;
-  const duration = points.length > 1 ? points[points.length - 1].t - start : 5;
-  return <section className="monitor-page">
+  const availablePoints = session?.points ?? [];
+  const latestTime = availablePoints.length ? availablePoints[availablePoints.length - 1].t : 0;
+  const earliestTime = availablePoints[0]?.t ?? 0;
+  const visibleDuration = Math.min(windowSeconds, Math.max(0.1, latestTime - earliestTime));
+  const start = Math.max(earliestTime, latestTime - visibleDuration);
+  const visiblePoints = availablePoints.filter(point => point.t >= start).map(p => ({t: p.t, v: raw ? p.raw : p.v}));
+  const duration = visiblePoints.length > 1 ? visiblePoints[visiblePoints.length - 1].t - start : Math.max(visibleDuration, 0.1);
+  return <section className="monitor-page live-monitor-page">
     <div className="monitor-heading"><div><p className="eyebrow">ADS1292R · 蓝牙采集</p>
       <h1>实时心电监测</h1><p>连接采集模块，在电脑上查看波形与心拍分类。</p></div>
       <span className={`capture-status ${active ? 'is-active' : ''}`} role="status">
         {connected ? session ? statusLabel[session.status] ?? session.status : '等待连接' : '服务连接中'}
       </span></div>
+    <div className="monitor-control-panel">
     <div className="capture-controls">
       <label>蓝牙 / USB 接收串口<select value={port} disabled={active || busy} onChange={e => setPort(e.target.value)}>
         <option value="">请选择串口</option>{ports.map(p => <option key={p.port} value={p.port}>{p.port} · {p.label}</option>)}
       </select></label>
-      <label>波特率<select value={baud} disabled={active || busy} onChange={e => setBaud(Number(e.target.value))}>
+      <details className="monitor-advanced"><summary>连接与分析设置</summary><div className="monitor-advanced-grid"><label>波特率<select value={baud} disabled={active || busy} onChange={e => setBaud(Number(e.target.value))}>
         {[9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600].map(v => <option key={v} value={v}>{v}</option>)}
       </select></label>
       <label>采集协议<select value={format} disabled={active || busy} onChange={e => setFormat(e.target.value)}>
         <option value="document_34">34 字节 · 4 组样本</option><option value="source_10">10 字节 · 1 组样本</option>
       </select></label>
       <label>分析模型<select value={model} disabled={active || busy} onChange={e => setModel(e.target.value)}>
-        <option value="cnn">CNN H27 · N/S/V/F</option><option value="hgb">HGB v92 · N/S/VF</option>
+        <option value="cnn">CNN H27 · N/S/V/F</option><option value="hgb">HGB v92 · N/S/VF</option><option value="ensemble">CNN主判 + HGB复核</option>
       </select></label>
+      </div></details>
     </div>
     <div className="actions">
       <button disabled={busy || !port || active || unsaved} onClick={() => void run(async () => {
@@ -97,6 +104,7 @@ export default function Monitor() {
       <button className="secondary" disabled={busy || active} onClick={() => void refreshPorts()}>刷新串口</button>
       <Link className="button secondary" to="/analyze">从 CSV 分析</Link>
     </div>
+    </div>
     {!ports.length && <p className="notice">未发现串口。请连接蓝牙 USB 接收器，或在 Windows 中完成蓝牙配对，然后刷新串口。</p>}
     {error && <p className="notice notice-error" role="alert">{error}</p>}
     {session?.error && <p className="notice notice-error" role="alert">{session.error}。已收到的数据会保留，可保存后开启新会话。</p>}
@@ -106,10 +114,25 @@ export default function Monitor() {
       <div><span>样本数</span><strong>{session?.sample_count.toLocaleString() ?? '0'}<small>500 Hz</small></strong></div>
       <div><span>已分析到</span><strong>{((session?.analysis_samples ?? 0) / 500).toFixed(1)}<small>秒</small></strong></div>
     </div>
+    <div className="monitor-wave-panel">
+    <div className="monitor-wave-heading"><div><h2>实时心电波形</h2><span>最近 {visibleDuration.toFixed(1)} 秒 · 可拖动调整窗口</span></div>
+      <span className={`capture-status ${active ? 'is-active' : ''}`}>{active ? '数据流动中' : '等待采集'}</span></div>
     <div className="wave-toolbar"><strong>最近 5 秒</strong>
-      <label className="inline"><input type="checkbox" checked={raw} onChange={e => setRaw(e.target.checked)} />原始波形</label>
+      <div className="monitor-segmented" role="group" aria-label="波形类型">
+        <button className={!raw ? 'selected' : ''} onClick={() => setRaw(false)}>滤波显示</button>
+        <button className={raw ? 'selected' : ''} onClick={() => setRaw(true)}>原始信号</button>
+      </div>
+      <span className="hint">{raw ? '标称 mV 原始信号' : '0.5–40 Hz 因果滤波，仅用于显示'}</span>
     </div>
-    <Waveform points={points} duration={duration} offset={start} unit="mV" />
+    <label className="monitor-window-slider">显示窗口
+      <input type="range" min={1} max={5} step={0.5} value={windowSeconds}
+             onChange={event => setWindowSeconds(Number(event.target.value))}
+             aria-label="波形显示窗口秒数" />
+      <span>{windowSeconds.toFixed(1)} 秒</span>
+    </label>
+    <Waveform points={visiblePoints} duration={duration} offset={start} unit="mV" />
+    <p className="hint monitor-wave-note">波形持续更新；心拍分类约每 4 秒重算本轮完整记录，在线结果至少滞后 2.5 秒，停止后再做整段分析。</p>
+    </div>
     {session?.prediction?.status === 'model_unavailable' && <p className="notice notice-error">{session.prediction.explanation}</p>}
     {!session?.prediction && <p className="empty-state">采集至少 4 秒后，可查看心率预览；保存后在记录详情查看完整分类。</p>}
   </section>;

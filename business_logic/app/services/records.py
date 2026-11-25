@@ -572,6 +572,54 @@ def _zone(name: str):
         raise ValidationError("时区无效，请使用 IANA 名称，如 Asia/Shanghai")
 
 
+def personal_history_advice(user: str, timezone_name: str, *, polish: bool = False) -> dict:
+    from app.services.history_advice import build_advice
+    from app.services.history_report import build_report, config, polish_report
+
+    zone = _zone(timezone_name)
+    now = datetime.now(zone)
+    today = now.date()
+    start = today - timedelta(days=34)
+    recent = today - timedelta(days=6)
+    cutoff = datetime.combine(start, datetime.min.time(), tzinfo=zone)
+    with connect() as db:
+        rows = db.execute(
+            """SELECT id, created_at, quality_status, model_version, heart_rate_bpm,
+                      json_extract(payload, '$.body_context.scene') AS scene,
+                      json_extract(payload, '$.body_context.feeling') AS feeling,
+                      json_extract(payload, '$.result.prediction.status') AS status,
+                      json_extract(payload, '$.result.prediction.model_sha256') AS model_hash,
+                      json_extract(payload, '$.result.prediction.beats.by_type') AS beat_counts
+               FROM records
+               WHERE owner_id=? AND supersedes_record_id IS NULL
+                 AND julianday(created_at) BETWEEN julianday(?) AND julianday(?)
+               ORDER BY julianday(created_at) DESC, id DESC""",
+            (user, cutoff.isoformat(), now.isoformat()),
+        ).fetchall()
+    measurements = []
+    for row in rows:
+        created = _parse_iso(row["created_at"])
+        if created:
+            day = created.astimezone(zone).date()
+            measurements.append(dict(row, date=day.isoformat(), recent=day >= recent))
+    report = build_report(measurements)
+    return {**build_advice(measurements), "report": polish_report(report) if polish else report,
+            "qwen_available": bool(config())}
+
+
+def update_body_context(user: str, identifier: str, context: dict) -> dict:
+    with connect() as db:
+        result = db.execute(
+            """UPDATE records SET payload=json_set(payload, '$.body_context', json(?)),
+                   updated_at=? WHERE id=? AND owner_id=? AND supersedes_record_id IS NULL""",
+            (json.dumps(context), _now(), identifier, user),
+        )
+        if not result.rowcount:
+            raise RecordNotFound("记录不存在或不支持编辑测量感受")
+        _audit(db, identifier, user, "note", "body_context")
+    return context
+
+
 def trend(user: str, shared: bool = False, days: int = 30, timezone_name: str = "UTC",
           fill: bool = True) -> dict:
     zone = _zone(timezone_name)
@@ -757,11 +805,9 @@ def update_note(user: str, identifier: str, note: str):
     if not row:
         raise RecordNotFound("记录不存在或没有编辑权限")
     with connect() as db:
-        payload = json.loads(row["payload"])
-        payload["note"] = text
         db.execute(
-            "UPDATE records SET note=?, updated_at=?, payload=? WHERE id=?",
-            (text, _now(), json.dumps(payload, ensure_ascii=False), identifier),
+            "UPDATE records SET note=?, updated_at=?, payload=json_set(payload, '$.note', ?) WHERE id=?",
+            (text, _now(), text, identifier),
         )
         _audit(db, identifier, user, "note")
     return detail(user, identifier)
@@ -783,7 +829,7 @@ def reanalyze(user: str, identifier: str, *, model_type: str | None = None) -> d
         raise InputUnavailable("原始输入已清理，无法重分析")
     signal = json.loads(task["payload"])
     if model_type is not None:
-        if model_type not in ('cnn', 'hgb', 'openecg', 'none'):
+        if model_type not in ('cnn', 'hgb', 'ensemble', 'openecg', 'none'):
             raise ValidationError('不支持的模型')
         signal['model_type'] = model_type
     new_task = submit(user, signal, source_record_id=identifier)
@@ -885,6 +931,8 @@ def detail(user: str, identifier: str):
             payload.setdefault(key, value)
     payload["owner_username"] = row["owner_username"]
     payload["owned"] = row["owner_id"] == user
+    if not payload["owned"]:
+        payload.pop("body_context", None)
     payload["has_raw_file"] = bool(row["input_path"] and Path(row["input_path"]).is_file())
     with connect() as db:
         _audit(db, identifier, user, "view")

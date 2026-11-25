@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   RecordPage, RecordTrends, downloadFile, localTimezone, request,
 } from '../services/api';
+import HistoryAdvice from '../components/HistoryAdvice';
 import TrendChart from '../components/TrendChart';
 import { QualityBadge } from '../components/badges';
 
@@ -45,8 +46,13 @@ export default function Records() {
     const params = new URLSearchParams({
       page: String(page), page_size: String(size), shared: String(shared),
     });
+    const status = search.get('status');
     if (quality) params.set('quality', quality);
-    if (range !== 'all') params.set('from', fromDate(days));
+    else if (status === 'normal') params.set('quality', 'basic_checks_passed');
+    else if (status === 'insufficient') params.set('quality', 'insufficient');
+    if (range !== 'all' && !search.get('from')) params.set('from', fromDate(days));
+    if (search.get('from')) params.set('from', search.get('from')!);
+    if (search.get('to')) params.set('to', search.get('to')!);
     const trendQuery = new URLSearchParams({
       days: String(days), shared: String(shared), timezone: localTimezone(),
     });
@@ -63,7 +69,7 @@ export default function Records() {
       if (active) setLoading(false);
     });
     return () => {active = false;};
-  }, [page, shared, range, quality, days, size, refresh]);
+  }, [page, shared, range, quality, days, size, refresh, search]);
 
   function update(patch: Record<string, string | null>) {
     const next = new URLSearchParams(search);
@@ -81,7 +87,7 @@ export default function Records() {
     try {
       await request(`/records/${id}`, {method: 'DELETE'});
       if (data?.items.length === 1 && page > 1) update({page: String(page - 1)});
-      else setRefresh(value => value + 1);
+      setRefresh(value => value + 1);
     } catch (caught) {
       setError((caught as Error).message);
     } finally {
@@ -91,11 +97,51 @@ export default function Records() {
 
   const summary = trends?.summary;
 
-  return <section>
-    <p className="eyebrow">记录业务</p>
-    <h1>历史记录</h1>
+  const filteredDays = trends?.days ?? [];
+  const rates = filteredDays.map(point => point.heart_rate_bpm).filter((value): value is number => value != null);
+  const minRate = rates.length ? Math.min(...rates) : null;
+  const maxRate = rates.length ? Math.max(...rates) : null;
+  const attentionCount = filteredDays.reduce((sum, point) => sum + (point.quality.insufficient ?? 0), 0);
+  const dayFilter = search.get('from') ?? '';
+  const statusFilter = search.get('status') ?? 'all';
+  const visibleItems = data?.items ?? [];
 
-    <div className="filter-bar">
+  return <section className="records-page">
+    <div className="records-heading">
+      <div><p className="eyebrow">个人健康档案</p><h1>心电历史趋势与档案</h1></div>
+      {summary && <span className="records-total">共 {summary.total} 次记录</span>}
+      <button className="secondary records-export" onClick={() => void downloadFile('/records/export?format=csv',
+        'ecg-history.csv').catch(caught => setError((caught as Error).message))}>导出 CSV</button>
+      {!shared && <button className="records-clear" onClick={() => update({from: null, to: null, status: 'all', range: '30', page: '1'})}>清除筛选</button>}
+    </div>
+
+    <div className="records-overview">
+      <div className="records-trend-panel">
+        <div className="records-trend-heading">
+          <div><h2>静息心率趋势折线图</h2><span>正常区间 60–100 BPM · 虚线为长期趋势基线</span></div>
+          <div className="range-pills" aria-label="趋势时间范围">
+            <button className={range === '7' ? 'selected' : ''} onClick={() => update({range: '7', page: '1'})}>过去一周（7天）</button>
+            <button className={range === '30' ? 'selected' : ''} onClick={() => update({range: '30', page: '1'})}>过去一月（30天）</button>
+          </div>
+        </div>
+        <div className="trend-kpis">
+          <span>平均心率 <strong>{summary?.avg_heart_rate_bpm ?? '—'}</strong> BPM</span>
+          <span>波动范围 <strong>{minRate ?? '—'}–{maxRate ?? '—'}</strong> BPM</span>
+          <span>有效记录 <strong>{summary?.heart_rate_days ?? 0}</strong> 天</span>
+          <span className="trend-kpi-total">共 {summary?.total ?? 0} 条测量</span>
+        </div>
+        {trends && <TrendChart days={trends.days} />}
+        <p className="trend-caption"><strong>趋势观察</strong> 所示为每日平均心率，测量间隔和身体活动可能影响读数。</p>
+      </div>
+      <div className="records-status-grid">
+        <article className="status-card status-ok"><span>正常记录</span><strong>{Math.max(0, (summary?.total ?? 0) - (summary?.insufficient ?? 0))}<small>次</small></strong><p>基础信号检查通过</p></article>
+        <article className="status-card status-watch"><span>质量待留意</span><strong>{attentionCount}<small>次</small></strong><p>可在静息状态下复测</p></article>
+        <article className="status-card status-advice"><span>有心率数据</span><strong>{summary?.heart_rate_days ?? 0}<small>天</small></strong><p>用于观察个人变化</p></article>
+        <article className="status-card status-info"><span>筛选范围</span><strong>{days}<small>天</small></strong><p>可调整下方时间范围</p></article>
+      </div>
+    </div>
+
+    <div className="filter-bar records-filters">
       <label className="inline">时间范围
         <select value={range} onChange={event => update({range: event.target.value, page: '1'})}>
           {RANGES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
@@ -122,24 +168,23 @@ export default function Records() {
         <button className="secondary" onClick={() => update({quality: null, range: '30', shared: null, page: '1'})}>重置筛选</button>}
     </div>
 
-    {summary && <div className="stat-grid">
-      <div><strong>{summary.total}</strong><span>近 {days} 天记录</span></div>
-      <div><strong>{summary.insufficient}</strong><span>质量不足</span></div>
-      <div><strong>{summary.heart_rate_days}</strong><span>有心率的日期</span></div>
-      <div><strong>{summary.avg_heart_rate_bpm ?? '—'}</strong><span>平均心率（次/分）</span></div>
-    </div>}
-
-    {trends && <TrendChart days={trends.days} />}
+    {!shared && <details className="advice-drawer"><summary>个人观察与建议</summary><HistoryAdvice refresh={refresh} /></details>}
 
     <p role="status">{loading ? '加载中…' : error}</p>
 
     {!loading && !error && data && <>
-      {data.items.length === 0 && <div className="empty-state">
+      <div className="archive-heading"><h2>历史记录明细</h2><div className="archive-tabs" aria-label="记录状态筛选">
+        <button className={statusFilter === 'all' ? 'selected' : ''} onClick={() => update({status: 'all', page: '1'})}>全部（{data.total}）</button>
+        <button className={statusFilter === 'normal' ? 'selected' : ''} onClick={() => update({status: 'normal', page: '1'})}>正常（{Math.max(0, data.total - (summary?.insufficient ?? 0))}）</button>
+        <button className={statusFilter === 'insufficient' ? 'selected' : ''} onClick={() => update({status: 'insufficient', page: '1'})}>关注（{summary?.insufficient ?? 0}）</button>
+        {dayFilter && <button className="archive-reset" onClick={() => update({from: null, to: null})}>取消日期筛选 ×</button>}
+      </div></div>
+      {visibleItems.length === 0 && <div className="empty-state">
         <p>{shared ? '暂时没有授权给你的记录。' : '还没有记录。'}</p>
         {!shared && <Link className="button" to="/analyze">导入第一条记录</Link>}
       </div>}
-      <div className="record-list">
-        {data.items.map(record => <div className="record-row" key={record.id}>
+      <div className="record-list records-archive">
+        {visibleItems.map(record => <div className="record-row" key={record.id}>
           <div className="record-main">
             <span>{new Date(record.created_at).toLocaleString()}</span>
             <small className="mono">{record.id}</small>

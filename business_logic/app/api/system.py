@@ -6,6 +6,7 @@ from fastapi import APIRouter, Response
 
 from app.core.config import settings
 from app.services.storage import connect
+from ai_model.registry.model_registry import model_manifests
 
 router = APIRouter(tags=['系统'])
 
@@ -18,6 +19,7 @@ def health(response: Response):
         'database': {'writable': True, 'schema_version': None},
         'tasks': {'mode': 'inprocess', 'workers': settings.task_workers, 'pending': 0, 'running': 0},
         'model': _model_state(),
+        'model_catalog': model_manifests(),
         'acquisition': 'replay_only',
         'capabilities': {
             'upload_formats': ['csv'],

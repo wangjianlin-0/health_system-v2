@@ -46,7 +46,7 @@ def _rhythm_prediction(processed: dict[str, Any]) -> dict[str, Any]:
 
 
 def _beat_prediction(model_type: str, processed: dict[str, Any]) -> dict[str, Any]:
-    if model_type not in {'cnn', 'hgb'}:
+    if model_type not in {'cnn', 'hgb', 'ensemble'}:
         return _unavailable(model_type or 'none', '未选择 CNN 或 HGB 逐拍模型。')
     return _run_model(model_type, processed)
 
@@ -99,7 +99,7 @@ def analyze(signal: dict[str, Any]) -> dict[str, Any]:
         r_peak_result = edge_r_peak_result
     elif (
         eligible
-        and selected_beat_model in {'cnn', 'hgb'}
+        and selected_beat_model in {'cnn', 'hgb', 'ensemble'}
         and edge_prediction.get('status') != 'classified'
     ):
         r_peak_result = _R_PEAK_DETECTOR.detect(
@@ -117,7 +117,7 @@ def analyze(signal: dict[str, Any]) -> dict[str, Any]:
             'heart_rate': {},
             'scope': '信号质量不足，未执行 R 峰检测',
         }
-    elif selected_beat_model in {'cnn', 'hgb'}:
+    elif selected_beat_model in {'cnn', 'hgb', 'ensemble'}:
         r_peak_result = {
             'status': 'insufficient',
             'provider': 'edge_model',
@@ -150,7 +150,10 @@ def analyze(signal: dict[str, Any]) -> dict[str, Any]:
         or r_peak_result.get('heart_rate')
         or rhythm_prediction.get('heart_rate')
     )
-    rate_result = rate_analysis(rate_source, r_peak_result)
+    rate_peaks = r_peak_result
+    if not r_peak_result.get('events') and openecg_events:
+        rate_peaks = _R_PEAK_DETECTOR.from_openecg(openecg_events, result['sample_rate_hz'])
+    rate_result = rate_analysis(rate_source, rate_peaks)
     respiration_result = _RESPIRATION_ANALYZER.analyze(result)
     safety = evaluate_safety(
         quality,
@@ -161,19 +164,37 @@ def analyze(signal: dict[str, Any]) -> dict[str, Any]:
         signal.get('symptoms') if isinstance(signal.get('symptoms'), list) else None,
     )
 
-    prediction = dict(edge_prediction)
+    # OpenECG is a record-level rhythm model, not a beat classifier.  When it is
+    # explicitly selected, expose its classified state at the compatibility
+    # top level instead of letting the intentionally absent beat model make the
+    # whole analysis look unavailable.
+    prediction = dict(
+        rhythm_prediction if selected_beat_model == 'openecg' else edge_prediction
+    )
     prediction['rhythm'] = rhythm_prediction.get('rhythm') or {}
     prediction['rhythm_model'] = {
         'status': rhythm_prediction.get('status'),
         'model_version': rhythm_prediction.get('model_version'),
+        'model_asset': rhythm_prediction.get('model_asset'),
+        'analysis_scope': rhythm_prediction.get('analysis_scope'),
     }
+    prediction['rhythm_dimensions'] = rhythm_prediction.get('rhythm_dimensions') or {}
+    prediction['rhythm_windows'] = rhythm_prediction.get('rhythm_windows') or []
+    prediction['rhythm_events'] = rhythm_prediction.get('rhythm_events') or []
     prediction['beats'] = legacy_beats(beat_result)
     prediction['heart_rate'] = rate_source.get('heart_rate')
     prediction['beat_model'] = {
-        'requested': selected_beat_model,
+        'requested': (
+            selected_beat_model
+            if selected_beat_model in {'cnn', 'hgb', 'ensemble'}
+            else 'none'
+        ),
         'status': edge_prediction.get('status'),
         'model_version': edge_prediction.get('model_version'),
     }
+    if edge_prediction.get('agreement'):
+        prediction['beat_model']['agreement'] = edge_prediction['agreement']
+        prediction['beat_model']['review_model'] = edge_prediction.get('review_model')
     evidence = build_evidence_payload(prediction, quality)
     evidence.update({
         'beat_analysis': beat_result,
@@ -187,7 +208,9 @@ def analyze(signal: dict[str, Any]) -> dict[str, Any]:
     explanation = generate_explanation(evidence)
     prediction['explanation_detail'] = explanation
     prediction['explanation'] = (
-        edge_prediction.get('explanation')
+        explanation.get('summary', '')
+        if rhythm_prediction.get('status') == 'classified'
+        else edge_prediction.get('explanation')
         if edge_prediction.get('status') == 'model_unavailable'
         else explanation.get('summary', '')
     )

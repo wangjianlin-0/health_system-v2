@@ -1,0 +1,14 @@
+{
+  "poor_signal_repeat": {
+    "advice": "下次录制时保持身体稳定，检查电极贴合和导线连接，再重新测量。",
+    "source": {"title": "本项目的心电采集质量指导", "section": "电极贴合与复测"}
+  },
+  "repeat_model_label": {
+    "advice": "可打开对应记录核对波形和测量时的情况。若需要咨询，可把这些记录提供给医务人员查看。",
+    "source": {"title": "本项目的逐拍模型结果说明", "section": "研究模型标签与适用范围"}
+  },
+  "track_measurement_context": {
+    "advice": "下次测量时可在记录详情的备注里写下测量场景，例如静息或活动后，方便回看时对照。",
+    "source": {"title": "本项目的历史记录使用说明", "section": "记录测量场景"}
+  }
+}

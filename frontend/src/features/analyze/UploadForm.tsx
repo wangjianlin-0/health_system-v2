@@ -45,8 +45,10 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
     pick(event.dataTransfer.files?.[0] ?? null);
   }
 
-  return <form onSubmit={submit}>
-    <p>支持单列 mV CSV（value/sample/mv 表头）、包含 value 列的系统记录导出 CSV，或包含 ecg_raw 的 ADS1292R 原始 CSV（按 2.42 V、6 倍增益换算）。默认采样率为 500 Hz；其他设备请按实际采样率修改。</p>
+  return <form className="upload-form" onSubmit={submit}>
+    <details className="upload-format-note"><summary>支持格式与采样说明</summary>
+      <p>支持单列 mV CSV（value/sample/mv 表头），或包含 ecg_raw 的 ADS1292R 原始 CSV。ADS1292R 按 2.42 V、6 倍增益换算。默认采样率 500 Hz，其他设备请按实际采样率修改。</p>
+    </details>
     <div className={`dropzone${dragging ? ' dragging' : ''}`}
          onDragOver={event => {event.preventDefault(); setDragging(true);}}
          onDragLeave={() => setDragging(false)}
@@ -54,20 +56,23 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
       <input id="ecg-file" type="file" accept=".csv" onChange={event => pick(event.target.files?.[0] ?? null)} />
       <label htmlFor="ecg-file" className="dropzone-label">
         <strong>{file ? file.name : '点击选择或拖入 CSV'}</strong>
-        <span>{file ? `${(file.size / 1024).toFixed(1)} KB` : 'mV 或 ADS1292R 原始 CSV · UTF-8 · ≤5 MB'}</span>
+        <span>{file ? `${(file.size / 1024).toFixed(1)} KB` : 'CSV · UTF-8 · 最大 5 MB'}</span>
       </label>
     </div>
-    <label>采样率 Hz
+    <div className="upload-settings">
+    <label>采样率 <span>Hz</span>
       <input type="number" min={50} max={2000} value={rate} required
              onChange={event => setRate(Number(event.target.value))} />
     </label>
-    <small className="hint">示例：仓库 csv/ptbxl_00001_lead_II_500Hz_10s.csv 为 500 Hz、10 秒。</small>
     <label>分析模型<select value={model} onChange={event => setModel(event.target.value)}>
       <option value="cnn">CNN H27 · 四类 N/S/V/F（500 Hz）</option>
       <option value="hgb">HGB v92 · 三类 N/S/VF（500 Hz）</option>
+      <option value="ensemble">CNN主判 + HGB一致性复核（500 Hz）</option>
       <option value="openecg">OpenECG · 可选依赖（500 Hz，至少 10 秒）</option>
       <option value="none">仅信号检查</option>
     </select></label>
+    </div>
+    <small className="hint upload-model-hint">CNN、HGB 和 OpenECG 模型对采样率及时长有要求，请按设备实际参数填写。</small>
     {progress > 0 && progress < 100 && <div className="progress" role="progressbar" aria-valuenow={progress}
           aria-valuemin={0} aria-valuemax={100}><span style={{width: `${progress}%`}} /></div>}
     {(localError || error) && <p className="notice notice-error" role="alert">{localError || error}</p>}

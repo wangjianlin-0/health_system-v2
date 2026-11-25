@@ -134,6 +134,9 @@ def test_health_reports_database_and_limits(client):
     assert body['database']['writable'] is True
     assert body['database']['schema_version'] >= 3
     assert body['model']['type'] == 'none'
+    assert body['model_catalog']['openecg']['backend'] == 'onnxruntime'
+    assert body['model_catalog']['openecg']['asset']['sha256']
+    assert body['model_catalog']['ensemble']['policy'].startswith('CNN primary')
     assert body['capabilities']['max_upload_bytes'] == 5_000_000
     assert body['tasks']['mode'] == 'inprocess'
     assert isinstance(body['tasks']['pending'], int)

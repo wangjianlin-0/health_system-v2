@@ -15,6 +15,9 @@ def load_classifier(model_type: str = 'none', model_path: str = '') -> Classifie
     if model_type in ('cnn', 'hgb'):
         from ai_model.inference.edge_adapter import EdgeClassifier
         return EdgeClassifier(model_type)
+    if model_type == 'ensemble':
+        from ai_model.inference.ensemble_beat_adapter import EnsembleBeatClassifier
+        return EnsembleBeatClassifier()
     raise ValueError(f'不支持的分类器: {model_type}')
 
 

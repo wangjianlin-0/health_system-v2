@@ -73,7 +73,7 @@ Windows PowerShell（仓库根目录）：
 
     .venv/Scripts/python.exe run_backend.py
 
-模型首次运行可能需要获取模型资源，请确保网络可用。当前适配器只接受 500 Hz、至少 10 秒的单导联 mV 信号，并仅分析前 10 秒。不能通过改填采样率或重复数据来凑时长。依赖装在哪个虚拟环境，就用哪个环境的 python 启动；只在 .env 写 openecg 不会安装模型包，启动后记录一直显示“未接入模型”时先用该环境的 python -c "import openecg" 自检。
+模型首次运行可能需要获取模型资源，请确保网络可用。当前适配器固定使用 OpenECG 0.11.0 自带的 `codec_v6_int8.onnx`，并记录权重大小及 SHA-256。输入必须是 500 Hz、至少 10 秒的单导联 mV 信号；长记录按 10 秒窗口分析，默认步长 5 秒（`ECG_RHYTHM_STEP_SECONDS=5`），最后不足一个步长的尾段也会覆盖。不能通过改填采样率或重复数据来凑时长。依赖装在哪个虚拟环境，就用哪个环境的 python 启动；只在 .env 写 openecg 不会安装模型包，启动后记录一直显示“未接入模型”时先用该环境的 python -c "import openecg" 自检。
 
 已提供 csv/ptbxl_00001_lead_II_500Hz_10s.csv：PTB-XL 公开记录的 II 导联，5000 点、500 Hz、10 秒。导入时采样率填 500，来源、转换说明及 CC BY 4.0 许可见 [样本说明](csv/README.md)。旧记录不会自动重新分析；可在详情页点“重新分析”或新建记录。
 

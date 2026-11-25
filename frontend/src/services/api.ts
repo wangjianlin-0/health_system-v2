@@ -25,8 +25,9 @@ export interface HeartRate {
   bpm: number;
   min_bpm?: number;
   max_bpm?: number;
+  rr_mean_ms?: number | null;
   rr_cv?: number;
-  regularity?: string;
+  regularity?: string | null;
 }
 export interface Prediction {
   classes?: string[];
@@ -39,6 +40,7 @@ export interface Prediction {
   explanation: string;
   heart_rate?: HeartRate | null;
   beat_model?: {requested: string; status?: string; model_version?: string | null};
+  rhythm_model?: {status?: string; model_version?: string | null; analysis_scope?: unknown};
   beats?: {count: number; vpc_count?: number; classified_count?: number; unclassified_count?: number;
     by_type?: Record<string, number>; items?: BeatItem[]} | null;
   explanation_detail?: {
@@ -148,6 +150,7 @@ export interface RecordSummary {
   owner_username?: string | null;
 }
 export interface RecordDetail extends RecordSummary {
+  body_context?: {scene: string | null; feeling: string | null};
   task_status: string;
   result: EcgResult;
   owned?: boolean;

@@ -21,12 +21,13 @@ export function decimate(values: number[], buckets: number): number[] {
   return output;
 }
 
-export default function Waveform({values = [], points, duration, unit, offset = 0}: {
+export default function Waveform({values = [], points, duration, unit, offset = 0, markers = []}: {
   values?: number[];
   points?: WaveformPoint[];
   duration: number;
   unit: string;
   offset?: number;
+  markers?: {time_sec: number; label: string; kind?: 'normal' | 'attention'}[];
 }) {
   const fromWindow = Boolean(points && points.length);
   if (!fromWindow && !values.length) return <p className="empty-state">没有波形数据。</p>;
@@ -71,6 +72,18 @@ export default function Waveform({values = [], points, duration, unit, offset = 
       <rect width="1000" height="240" fill="url(#ecg-grid)" />
       <line x1={left} y1={top} x2={left} y2={bottom} stroke="#b9cfca" />
       <line x1={left} y1={bottom} x2={right} y2={bottom} stroke="#b9cfca" />
+      {markers.filter(marker => marker.time_sec >= offset && marker.time_sec <= offset + duration).map((marker, index) => {
+        const markerX = xOf(marker.time_sec);
+        const attention = marker.kind === 'attention';
+        return <g key={`${marker.time_sec}-${index}`}>
+          {attention && <rect x={markerX - 9} y={top} width="18" height={bottom - top}
+                              fill="#df46531a" />}
+          <circle cx={markerX} cy={top + 8} r={attention ? 3.5 : 2.4}
+                  fill={attention ? '#d43e50' : '#77859a'} />
+          <text x={markerX} y={top - 3} textAnchor="middle"
+                className={attention ? 'wave-beat-label is-attention' : 'wave-beat-label'}>{marker.label}</text>
+        </g>;
+      })}
       <polyline points={coordinates} fill="none" stroke="#157a70" strokeWidth="1.3" />
       <text x={left - 6} y={top + 4} textAnchor="end" className="wave-label">{max.toFixed(3)}</text>
       <text x={left - 6} y={bottom} textAnchor="end" className="wave-label">{min.toFixed(3)}</text>

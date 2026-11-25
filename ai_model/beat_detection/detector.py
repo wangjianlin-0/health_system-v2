@@ -14,6 +14,11 @@ class RPeakDetector:
             provider or os.environ.get('ECG_RPEAK_PROVIDER', 'neurokit2')
         ).lower()
 
+    @classmethod
+    def from_openecg(cls, events: list[dict[str, Any]], sample_rate_hz: float) -> dict[str, Any]:
+        peaks = cls._normalize_openecg(events, sample_rate_hz)
+        return cls._result(peaks, sample_rate_hz, 'openecg_events')
+
     def detect(
         self,
         waveform: list[float],

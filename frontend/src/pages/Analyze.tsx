@@ -126,7 +126,7 @@ export default function Analyze() {
     </section>;
   }
 
-  return <section>
+  return <section className="upload-page">
     <p className="eyebrow">记录与分析</p>
     <h1>新建记录</h1>
     <UploadForm onSubmit={(file, rate, model) => void submitFile(file, rate, model)}

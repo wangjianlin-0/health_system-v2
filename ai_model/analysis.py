@@ -19,6 +19,25 @@ EDGE_LABELS = {
 
 
 def rhythm_analysis(prediction: dict[str, Any]) -> dict[str, Any]:
+    dimensions = prediction.get('rhythm_dimensions') or {}
+    if dimensions:
+        rhythm_dimension = dimensions.get('rhythm') or {}
+        conduction = dimensions.get('conduction') or {}
+        return {
+            'status': prediction.get('status', 'unknown'),
+            'primary': rhythm_dimension.get('primary', 'unknown'),
+            'observed': rhythm_dimension.get('observed', []),
+            'raw_label': (prediction.get('rhythm') or {}).get('label'),
+            'confidence': prediction.get('confidence'),
+            'distribution': (prediction.get('rhythm') or {}).get('distribution', {}),
+            'conduction_flags': conduction.get('flags', []),
+            'rhythm_events': rhythm_dimension.get('events', []),
+            'conduction_events': conduction.get('events', []),
+            'windows': prediction.get('rhythm_windows', []),
+            'analysis_scope': prediction.get('analysis_scope', {}),
+            'model_asset': prediction.get('model_asset'),
+            'model_version': prediction.get('model_version'),
+        }
     rhythm = prediction.get('rhythm') or {}
     raw_label = str(rhythm.get('label') or prediction.get('raw_label') or '').lower()
     if not raw_label:
@@ -53,7 +72,9 @@ def rate_analysis(
     prediction: dict[str, Any],
     r_peak_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    heart_rate = prediction.get('heart_rate') or (r_peak_result or {}).get('heart_rate') or {}
+    r_peak_rate = (r_peak_result or {}).get('heart_rate') or {}
+    # Keep the model's BPM precision while retaining RR metrics from the detected peaks.
+    heart_rate = {**r_peak_rate, **(prediction.get('heart_rate') or {})}
     bpm = heart_rate.get('bpm')
     low = float(os.environ.get('ECG_LOW_RATE_BPM', '50'))
     high = float(os.environ.get('ECG_HIGH_RATE_BPM', '100'))

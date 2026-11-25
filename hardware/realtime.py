@@ -250,8 +250,8 @@ class Acquisition:
         self.sessions = {}
 
     def start(self, owner, port, baud, format, model, directory, *, serial_factory=WindowsSerial):
-        if model not in ('cnn', 'hgb'):
-            raise ValueError('实时采集请选择CNN或HGB')
+        if model not in ('cnn', 'hgb', 'ensemble'):
+            raise ValueError('实时采集请选择CNN、HGB或CNN+HGB复核')
         with self.lock:
             if any(not s.done.is_set() for s in self.sessions.values()):
                 raise ValueError('采集端口正被使用，请先结束当前会话')

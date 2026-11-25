@@ -1,4 +1,6 @@
 """记录模块：记录及分析使用流程 HTTP 接口（薄路由，业务在 services.records）。"""
+from typing import Literal
+
 from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,8 +21,15 @@ class NoteUpdate(BaseModel):
     note: str = Field(default='', max_length=500)
 
 
+class BodyContext(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    scene: Literal["rest", "after_activity", "other"] | None = None
+    feeling: Literal["none", "palpitations", "other"] | None = None
+
+
 class ReanalysisOptions(BaseModel):
-    model_type: str | None = Field(default=None, pattern='^(cnn|hgb|openecg|none)$')
+    model_type: str | None = Field(default=None, pattern='^(cnn|hgb|ensemble|openecg|none)$')
 
 
 @router.post('/analyze/ecg', status_code=202)
@@ -39,8 +48,8 @@ async def upload(response: Response, file: UploadFile = File(...),
         raise ValueError('CSV 请使用 UTF-8 编码')
     signal = parse_csv(text, sample_rate_hz)
     if model_type is not None:
-        if model_type not in ('cnn', 'hgb', 'openecg', 'none'):
-            raise ValueError('模型须为cnn、hgb、openecg或none')
+        if model_type not in ('cnn', 'hgb', 'ensemble', 'openecg', 'none'):
+            raise ValueError('模型须为cnn、hgb、ensemble、openecg或none')
         signal['model_type'] = model_type
     task, created = records.submit_task(user, signal, idempotency_key=idempotency_key)
     if created:
@@ -83,6 +92,21 @@ def trends(shared: bool = False, days: int = Query(default=30, ge=1, le=365),
            timezone: str = Query(default='UTC'), fill: bool = True,
            user: str = Depends(current_user)):
     return records.trend(user, shared, days, timezone, fill)
+
+
+@router.get('/records/advice')
+def advice(timezone: str = Query(default='UTC'), user: str = Depends(current_user)):
+    return records.personal_history_advice(user, timezone)
+
+
+@router.post('/records/advice/polish')
+def polish_advice(timezone: str = Query(default='UTC'), user: str = Depends(current_user)):
+    return records.personal_history_advice(user, timezone, polish=True)
+
+
+@router.patch('/records/{identifier}/body-context')
+def body_context(identifier: str, body: BodyContext, user: str = Depends(current_user)):
+    return records.update_body_context(user, identifier, body.model_dump())
 
 
 @router.get('/records/{identifier}/waveform')
