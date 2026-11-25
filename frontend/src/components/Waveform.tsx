@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { WaveformPoint } from '../services/api';
 
 export function decimate(values: number[], buckets: number): number[] {
@@ -28,13 +29,25 @@ export default function Waveform({values = [], points, duration, unit, offset = 
   unit: string;
   offset?: number;
 }) {
+  const gridId = useId();
   const fromWindow = Boolean(points && points.length);
   if (!fromWindow && !values.length) return <p className="empty-state">没有波形数据。</p>;
 
-  const source = fromWindow ? points! : decimate(values, 600).map((value, index, array) => ({
-    t: offset + (index / Math.max(array.length - 1, 1)) * duration,
-    v: value,
-  }));
+  const source: WaveformPoint[] = fromWindow ? points! : [];
+  if (!fromWindow) {
+    const size = Math.max(1, Math.ceil(values.length / 600));
+    for (let start = 0; start < values.length; start += size) {
+      const end = Math.min(values.length, start + size);
+      let minIndex = start, maxIndex = start;
+      for (let index = start + 1; index < end; index++) {
+        if (values[index] < values[minIndex]) minIndex = index;
+        if (values[index] > values[maxIndex]) maxIndex = index;
+      }
+      for (const index of [...new Set([minIndex, maxIndex])].sort((a, b) => a - b)) {
+        source.push({t: offset + index / Math.max(values.length - 1, 1) * duration, v: values[index]});
+      }
+    }
+  }
   if (!source.length) return <p className="empty-state">没有波形数据。</p>;
 
   let min = Infinity;
@@ -64,11 +77,11 @@ export default function Waveform({values = [], points, duration, unit, offset = 
     <svg viewBox="0 0 1000 240" role="img"
          aria-label={`心电波形，${offset.toFixed(2)} 到 ${(offset + duration).toFixed(2)} 秒，${source.length} 个绘制点`}>
       <defs>
-        <pattern id="ecg-grid" width="50" height="40" patternUnits="userSpaceOnUse">
+        <pattern id={gridId} width="50" height="40" patternUnits="userSpaceOnUse">
           <path d="M 50 0 L 0 0 0 40" fill="none" stroke="#dce8e3" />
         </pattern>
       </defs>
-      <rect width="1000" height="240" fill="url(#ecg-grid)" />
+      <rect width="1000" height="240" fill={`url(#${gridId})`} />
       <line x1={left} y1={top} x2={left} y2={bottom} stroke="#b9cfca" />
       <line x1={left} y1={bottom} x2={right} y2={bottom} stroke="#b9cfca" />
       <polyline points={coordinates} fill="none" stroke="#157a70" strokeWidth="1.3" />
