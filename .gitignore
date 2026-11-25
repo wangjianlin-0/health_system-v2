@@ -54,3 +54,4 @@ tests/.tmp/*
 /*.spec
 
 /.desktop-exe-test/
+.venv-run/

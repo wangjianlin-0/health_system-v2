@@ -37,7 +37,7 @@ def test_fresh_database_is_migrated_and_idempotent(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, 'DB', tmp_path / 'fresh.sqlite3')
     first = storage.initialize()
     assert first['current'] >= 5
-    assert first['applied'] == [1, 2, 3, 4, 5, 6]
+    assert first['applied'] == [1, 2, 3, 4, 5, 6, 7, 8]
     second = storage.initialize()
     assert second['applied'] == []
     assert second['current'] == first['current']

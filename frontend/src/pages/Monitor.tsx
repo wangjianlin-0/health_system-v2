@@ -20,6 +20,7 @@ export default function Monitor() {
   const [baud, setBaud] = useState(115200);
   const [format, setFormat] = useState('document_34');
   const [model, setModel] = useState('cnn');
+  const [title, setTitle] = useState('');
   const [session, setSession] = useState<Capture | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -68,12 +69,28 @@ export default function Monitor() {
   const visiblePoints = availablePoints.filter(point => point.t >= start).map(p => ({t: p.t, v: raw ? p.raw : p.v}));
   const duration = visiblePoints.length > 1 ? visiblePoints[visiblePoints.length - 1].t - start : Math.max(visibleDuration, 0.1);
   return <section className="monitor-page live-monitor-page">
+    <p className="eyebrow monitor-page-eyebrow">设备连接与测量</p>
+    <h1 className="monitor-page-title">实时心电监测</h1>
     <div className="monitor-heading"><div><p className="eyebrow">ADS1292R · 蓝牙采集</p>
-      <h1>实时心电监测</h1><p>连接采集模块，在电脑上查看波形与心拍分类。</p></div>
+      <h2>开始一次心电采集</h2><p>连接采集模块，在电脑上查看波形与心拍分类。</p></div>
       <span className={`capture-status ${active ? 'is-active' : ''}`} role="status">
         {connected ? session ? statusLabel[session.status] ?? session.status : '等待连接' : '服务连接中'}
       </span></div>
+    <div className="monitor-steps" aria-label="采集操作步骤">
+      <div><b>1 配对设备</b><span>在 Windows 蓝牙设置中配对接收器，确认电极和采集模块已连接。</span></div>
+      <div><b>2 选择串口</b><span>从下方选择新出现的 COM 端口；不确定时可先断开设备，对比刷新前后的列表。</span></div>
+      <div><b>3 开始并保存</b><span>点击“开始采集”，看到波形后停止，再点“保存并完整分析”。</span></div>
+    </div>
+    <details className="monitor-help"><summary>不知道该选哪个串口？查看详细步骤</summary>
+      <p>先在 Windows 设备管理器的“端口 (COM 和 LPT)”中确认蓝牙或 USB 接收器对应的 COM 编号。若列表为空，检查设备电源、配对和驱动，然后点“刷新串口”。协议和波特率请按硬件说明设置；默认值不保证适用于所有设备。</p>
+      <p>没有设备也可以进入“导入与分析”，用 CSV 或合成回放熟悉流程。合成数据仅供功能演示。</p>
+      <Link to="/guide">打开完整使用手册</Link>
+    </details>
     <div className="monitor-control-panel">
+    <label className="monitor-title">本次记录名称（可选）
+      <input maxLength={80} value={title} onChange={event => setTitle(event.target.value)}
+        placeholder="留空则按日期和当天次数命名" />
+    </label>
     <div className="capture-controls">
       <label>蓝牙 / USB 接收串口<select value={port} disabled={active || busy} onChange={e => setPort(e.target.value)}>
         <option value="">请选择串口</option>{ports.map(p => <option key={p.port} value={p.port}>{p.port} · {p.label}</option>)}
@@ -87,6 +104,7 @@ export default function Monitor() {
       <label>分析模型<select value={model} disabled={active || busy} onChange={e => setModel(e.target.value)}>
         <option value="cnn">CNN H27 · N/S/V/F</option><option value="hgb">HGB v92 · N/S/VF</option><option value="ensemble">CNN主判 + HGB复核</option>
       </select></label>
+      <Link className="monitor-model-guide" to="/guide#guide-models">不知道选哪个模型？查看使用手册 →</Link>
       </div></details>
     </div>
     <div className="actions">
@@ -98,7 +116,7 @@ export default function Monitor() {
       })}>停止采集</button>
       <button className="secondary" disabled={busy || active || !session?.sample_count || Boolean(session?.task)}
         onClick={() => void run(async () => {
-          const task = await post<AnalysisTask>(`/acquisition/sessions/${session!.id}/save`);
+          const task = await post<AnalysisTask>(`/acquisition/sessions/${session!.id}/save`, {title: title.trim()});
           navigate('/analyze?task=' + task.id);
         })}>保存并完整分析</button>
       <button className="secondary" disabled={busy || active} onClick={() => void refreshPorts()}>刷新串口</button>

@@ -1,5 +1,4 @@
 """记录模块：记录及分析使用流程 HTTP 接口（薄路由，业务在 services.records）。"""
-from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -24,8 +23,13 @@ class NoteUpdate(BaseModel):
 class BodyContext(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    scene: Literal["rest", "after_activity", "other"] | None = None
-    feeling: Literal["none", "palpitations", "other"] | None = None
+    scene: str | None = Field(default=None, max_length=80)
+    feeling: str | None = Field(default=None, max_length=80)
+
+
+class TitleUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(default="", max_length=80)
 
 
 class ReanalysisOptions(BaseModel):
@@ -36,6 +40,7 @@ class ReanalysisOptions(BaseModel):
 async def upload(response: Response, file: UploadFile = File(...),
                  sample_rate_hz: float = Form(...), user: str = Depends(current_user),
                  model_type: str | None = Form(default=None),
+                 title: str = Form(default="", max_length=80),
                  idempotency_key: str | None = Header(default=None, alias='Idempotency-Key')):
     if not file.filename or not file.filename.lower().endswith('.csv'):
         raise ValueError('首版仅支持单列 CSV；WFDB/EDF 解析待信号模块扩展')
@@ -47,6 +52,8 @@ async def upload(response: Response, file: UploadFile = File(...),
     except UnicodeDecodeError:
         raise ValueError('CSV 请使用 UTF-8 编码')
     signal = parse_csv(text, sample_rate_hz)
+    if title.strip():
+        signal["record_title"] = title.strip()
     if model_type is not None:
         if model_type not in ('cnn', 'hgb', 'ensemble', 'openecg', 'none'):
             raise ValueError('模型须为cnn、hgb、ensemble、openecg或none')
@@ -104,9 +111,19 @@ def polish_advice(timezone: str = Query(default='UTC'), user: str = Depends(curr
     return records.personal_history_advice(user, timezone, polish=True)
 
 
+@router.get('/records/body-context/suggestions')
+def body_context_suggestions(user: str = Depends(current_user)):
+    return records.body_context_suggestions(user)
+
+
 @router.patch('/records/{identifier}/body-context')
 def body_context(identifier: str, body: BodyContext, user: str = Depends(current_user)):
     return records.update_body_context(user, identifier, body.model_dump())
+
+
+@router.patch("/records/{identifier}/title")
+def update_title(identifier: str, body: TitleUpdate, user: str = Depends(current_user)):
+    return records.update_title(user, identifier, body.title)
 
 
 @router.get('/records/{identifier}/waveform')

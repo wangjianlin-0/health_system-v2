@@ -43,7 +43,7 @@ export default function Analyze() {
     return () => {active = false;};
   }, [id]);
 
-  async function submitFile(file: File, rate: number, model: string) {
+  async function submitFile(file: File, rate: number, model: string, title: string) {
     setBusy(true);
     setProgress(0);
     setSubmitError('');
@@ -52,6 +52,7 @@ export default function Analyze() {
       body.append('file', file);
       body.append('sample_rate_hz', String(rate));
       body.append('model_type', model);
+      body.append('title', title);
       const next = await uploadWithProgress<AnalysisTask>('/analyze/ecg', body, setProgress);
       setProgress(100);
       setSearch({task: next.id});
@@ -62,11 +63,11 @@ export default function Analyze() {
     }
   }
 
-  async function replay() {
+  async function replay(title: string) {
     setBusy(true);
     setSubmitError('');
     try {
-      const next = await post<AnalysisTask>('/acquisition/replay');
+      const next = await post<AnalysisTask>('/acquisition/replay', {title});
       setSearch({task: next.id});
     } catch (caught) {
       setSubmitError((caught as Error).message);
@@ -129,7 +130,7 @@ export default function Analyze() {
   return <section className="upload-page">
     <p className="eyebrow">记录与分析</p>
     <h1>新建记录</h1>
-    <UploadForm onSubmit={(file, rate, model) => void submitFile(file, rate, model)}
-                onReplay={() => void replay()} busy={busy} progress={progress} error={submitError} />
+    <UploadForm onSubmit={(file, rate, model, title) => void submitFile(file, rate, model, title)}
+                onReplay={(title) => void replay(title)} busy={busy} progress={progress} error={submitError} />
   </section>;
 }

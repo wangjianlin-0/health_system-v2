@@ -1,8 +1,9 @@
 // 记录模块：历史、趋势、导出与记录删除页面。
+import {modelDisplay} from '../features/analyze/RecordDetail';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  RecordPage, RecordTrends, downloadFile, localTimezone, request,
+  RecordPage, RecordTrends, downloadFile, localTimezone, recordSourceLabel, request,
 } from '../services/api';
 import HistoryAdvice from '../components/HistoryAdvice';
 import TrendChart from '../components/TrendChart';
@@ -26,6 +27,7 @@ export default function Records() {
   const [search, setSearch] = useSearchParams();
   const page = Math.max(1, Number(search.get('page') ?? '1') || 1);
   const shared = search.get('shared') === 'true';
+  const view = search.get('view') === 'overview' ? 'overview' : search.get('view') === 'advice' ? 'advice' : 'records';
   const range = search.get('range') ?? '30';
   const quality = search.get('quality') ?? '';
   const rawSize = Number(search.get('size') ?? '10');
@@ -115,6 +117,12 @@ export default function Records() {
       {!shared && <button className="records-clear" onClick={() => update({from: null, to: null, status: 'all', range: '30', page: '1'})}>清除筛选</button>}
     </div>
 
+    <div className="records-view-tabs" role="tablist" aria-label="历史记录视图">
+      <button type="button" role="tab" aria-selected={view === 'records'} className={view === 'records' ? 'selected' : ''} onClick={() => update({view: 'records'})}>记录明细</button>
+      <button type="button" role="tab" aria-selected={view === 'overview'} className={view === 'overview' ? 'selected' : ''} onClick={() => update({view: 'overview'})}>趋势概览</button>
+      {!shared && <button type="button" role="tab" aria-selected={view === 'advice'} className={view === 'advice' ? 'selected' : ''} onClick={() => update({view: 'advice'})}>个人观察与建议</button>}
+    </div>
+    {view === 'overview' && <>
     <div className="records-overview">
       <div className="records-trend-panel">
         <div className="records-trend-heading">
@@ -141,6 +149,9 @@ export default function Records() {
       </div>
     </div>
 
+    </>}
+    {view === 'advice' && !shared && <div className="records-advice-page"><p className="eyebrow">近期记录解读</p><HistoryAdvice refresh={refresh} /></div>}
+    {view === 'records' && <>
     <div className="filter-bar records-filters">
       <label className="inline">时间范围
         <select value={range} onChange={event => update({range: event.target.value, page: '1'})}>
@@ -168,7 +179,7 @@ export default function Records() {
         <button className="secondary" onClick={() => update({quality: null, range: '30', shared: null, page: '1'})}>重置筛选</button>}
     </div>
 
-    {!shared && <details className="advice-drawer"><summary>个人观察与建议</summary><HistoryAdvice refresh={refresh} /></details>}
+
 
     <p role="status">{loading ? '加载中…' : error}</p>
 
@@ -186,13 +197,14 @@ export default function Records() {
       <div className="record-list records-archive">
         {visibleItems.map(record => <div className="record-row" key={record.id}>
           <div className="record-main">
-            <span>{new Date(record.created_at).toLocaleString()}</span>
-            <small className="mono">{record.id}</small>
+            <strong className="record-title">{record.title}</strong>
+            <span className="record-model-tag">{modelDisplay(record.model_version)}</span>
+            <small className="record-date">{new Date(record.created_at).toLocaleString()}</small>
             {shared && <span className="owner-tag">{record.owner_username ?? '已共享'}</span>}
           </div>
           <div className="record-quality">
             <QualityBadge status={record.quality_status} score={record.quality_score} />
-            {record.source && <span className="badge badge-muted">{record.source}</span>}
+            {record.source && <span className="badge badge-muted">{recordSourceLabel(record.source)}</span>}
           </div>
           <span className="record-metric">{record.duration_sec == null ? '—' : `${record.duration_sec.toFixed(1)} s`}</span>
           <span className="record-metric">{record.heart_rate_bpm == null ? '—' : `${record.heart_rate_bpm} 次/分`}</span>
@@ -214,6 +226,7 @@ export default function Records() {
         <span>第 {page} / {data.pages} 页，共 {data.total} 条</span>
         <button disabled={page >= data.pages} onClick={() => update({page: String(page + 1)})}>下一页</button>
       </div>}
+    </>}
     </>}
   </section>;
 }

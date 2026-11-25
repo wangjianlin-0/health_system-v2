@@ -2,6 +2,8 @@
 import hashlib
 import hmac
 import secrets
+import sqlite3
+from datetime import datetime, timedelta, timezone
 import time
 from app.services.storage import connect
 
@@ -14,7 +16,7 @@ def register(username, password):
     if not isinstance(username, str) or not username.strip() or not isinstance(password, str) or len(password) < 8:
         raise ValueError('用户名不能为空，密码至少 8 位')
     with connect() as db:
-        db.execute('INSERT INTO users VALUES (?,?,?)', (secrets.token_hex(12), username.strip(), password_hash(password)))
+        db.execute('INSERT INTO users(id, username, password_hash) VALUES (?,?,?)', (secrets.token_hex(12), username.strip(), password_hash(password)))
     return {'message': '注册成功，请登录'}
 
 def login(username, password):
@@ -37,6 +39,51 @@ def logout(token):
     with connect() as db:
         db.execute('DELETE FROM sessions WHERE token=?', (token,))
     return {'message': '已退出'}
+
+def profile(user):
+    with connect() as db:
+        row = db.execute("SELECT username, age, sex FROM users WHERE id=?", (user,)).fetchone()
+        if not row:
+            raise LookupError("用户不存在")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        average = db.execute(
+            "SELECT AVG(heart_rate_bpm), COUNT(heart_rate_bpm) FROM records "
+            "WHERE owner_id=? AND supersedes_record_id IS NULL AND created_at>=?",
+            (user, cutoff),
+        ).fetchone()
+    return {"username": row["username"], "age": row["age"], "sex": row["sex"],
+            "avg_heart_rate_bpm": round(average[0], 1) if average[0] is not None else None,
+            "heart_rate_record_count": average[1]}
+
+
+def update_profile(user, username, age, sex):
+    name = username.strip()
+    if not name:
+        raise ValueError("用户名不能为空")
+    try:
+        with connect() as db:
+            db.execute("UPDATE users SET username=?, age=?, sex=? WHERE id=?",
+                       (name, age, sex, user))
+    except sqlite3.IntegrityError as exc:
+        raise ValueError("用户名已被使用") from exc
+    return profile(user)
+
+
+def update_password(user, current_password, new_password):
+    if len(new_password) < 8:
+        raise ValueError("新密码至少 8 位")
+    with connect() as db:
+        row = db.execute("SELECT password_hash FROM users WHERE id=?", (user,)).fetchone()
+        if not row or not hmac.compare_digest(
+            row["password_hash"],
+            password_hash(current_password, row["password_hash"].split(":")[0]),
+        ):
+            raise ValueError("当前密码不正确")
+        db.execute("UPDATE users SET password_hash=? WHERE id=?",
+                   (password_hash(new_password), user))
+        db.execute("DELETE FROM sessions WHERE user_id=?", (user,))
+    return {"message": "密码已更新，请重新登录"}
+
 
 def grants(owner):
     _expire()

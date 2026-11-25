@@ -217,3 +217,211 @@ body:has(.dashboard-page) main{width:calc(100% - 44px);max-width:1760px;margin:1
 @media(max-width:760px){.stat-grid{grid-template-columns:repeat(2,1fr)}.result-grid{grid-template-columns:1fr}.record-row{grid-template-columns:1fr 1fr;gap:8px}.record-actions{grid-column:1/-1;justify-content:flex-start}.record-main{grid-column:1/-1}}
 
 .beat-classification-panel{border-top:4px solid #147b74}.beat-classification-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}.beat-classification-heading h2{margin:0}.beat-classification-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}.beat-classification-grid>div{padding:16px;background:#f2f7f5;border:1px solid #d8e7e4;border-radius:12px}.beat-classification-grid dt{display:flex;flex-direction:column;gap:8px;color:#526e74;font-size:13px}.beat-class-code{font-size:20px;font-weight:700;color:#147b74}.beat-classification-grid dd{margin:12px 0 0;font-size:30px;font-variant-numeric:tabular-nums;color:#173f48}.beat-classification-grid dd span{margin-left:8px;font-size:12px;color:#698580}@media(max-width:620px){.beat-classification-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Feedback round: shared sizing, accessible help, and portal dashboard. */
+:root{--font-scale:1}
+body{zoom:var(--font-scale)}
+.app-header .header-links{display:flex;gap:14px;align-items:center;margin-left:auto}
+.app-header .header-links a{color:#e6f5f2;text-decoration:none;font-size:14px}
+.app-header .header-links a.active{text-decoration:underline;text-underline-offset:5px}
+.app-header .header-links+button{margin-left:0}
+body:has(.family-page) main{max-width:1600px;margin:8px auto;padding:0 18px}
+body:has(.family-page) nav{gap:6px;margin:6px 0 10px}
+body:has(.family-page) nav a{padding:7px 10px;font-size:13px}
+.family-page{padding:18px 22px;margin:8px 0}
+.family-page h1{font-size:24px;margin:5px 0}
+.family-page h2{font-size:16px;margin:18px 0 8px}
+.family-page p{font-size:13px;margin:7px 0}
+.family-page form{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.family-page form label{margin:5px 0;font-size:13px}
+.family-page form input{width:300px;padding:8px;margin-top:4px}
+.family-page form button{padding:9px 13px}
+.family-grant-row{padding:9px 0}
+.record-main{min-width:0}
+.record-main .record-title{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.record-main .record-date{font-size:11px;color:#72849a}
+.record-rename{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-top:8px}
+.record-rename label{margin:0;font-size:12px}
+.record-rename input{width:260px;padding:7px;margin-top:3px}
+.record-rename button{padding:8px 11px;font-size:12px}
+.record-title-input{margin:12px 0;font-size:13px}
+.record-title-input input{width:min(100%,420px)}
+.body-context-custom{margin:8px 0;font-size:13px}
+.body-context-custom input{width:min(100%,360px)}
+.monitor-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:10px 0}
+.monitor-steps>div{display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid #dce8e6;border-radius:10px;background:#f5faf8}
+.monitor-steps b{color:#195b59;font-size:13px}
+.monitor-steps span{color:#5b7380;font-size:12px;line-height:1.5}
+.monitor-help{margin:8px 0 12px;padding:10px 13px;border:1px solid #dce7ed;border-radius:10px;background:white;font-size:13px}
+.monitor-help summary{cursor:pointer;color:#256b69;font-weight:650}
+.monitor-help p{font-size:12px}
+.guide-page,.profile-page{padding:24px}
+.guide-grid,.profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}
+.guide-grid article,.profile-grid article,.guide-safety{padding:18px;border:1px solid #dce8e6;border-radius:13px;background:#f8fbfa}
+.guide-grid article>span{font-weight:700;color:#238779}
+.guide-grid h2,.profile-grid h2{margin:7px 0;font-size:17px}
+.guide-grid p,.profile-grid p{font-size:13px}
+.guide-grid a,.portal-panel a{color:#19786f;text-decoration:none;font-weight:650}
+.guide-safety{background:#fffaf0;border-color:#eadfbe}
+.guide-safety p{font-size:13px}
+.guide-sources{border-top:1px solid #e6dcc4;padding-top:10px}
+.profile-grid label{font-size:13px}
+.profile-grid input,.profile-grid select{width:min(100%,360px);padding:9px;margin-top:5px}
+.profile-grid input[type=range]{padding:0}
+.profile-average strong{font-size:36px;color:#146f69}
+.profile-average span{margin-left:6px}
+.portal-dashboard{padding:22px;background:#f7fafb;box-shadow:none}
+.portal-top{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}
+.portal-welcome,.portal-summary,.portal-panel{padding:22px;border:1px solid #dae6e9;border-radius:16px;background:white;box-shadow:0 3px 12px #1b42550a}
+.portal-welcome{background:linear-gradient(135deg,#edf8f6,#f8fbfd)}
+.portal-welcome h1{font-size:31px;margin:3px 0}
+.portal-welcome>p{margin:4px 0;font-size:14px}
+.portal-primary-actions{display:flex;gap:9px;margin:24px 0 18px}
+.portal-device{color:#5e7c81;font-size:12px!important}
+.portal-summary h2{margin:0 0 15px;font-size:18px}
+.portal-stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:16px}
+.portal-stat-grid>div{display:flex;flex-direction:column;gap:5px;padding:12px;background:#f3f8f7;border-radius:10px}
+.portal-stat-grid strong{font-size:26px;color:#174e53}
+.portal-stat-grid span{font-size:12px;color:#647f85}
+.portal-summary>a{color:#19786f;text-decoration:none;font-size:13px;font-weight:650}
+.portal-columns{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(250px,.85fr);gap:16px;margin-top:16px}
+.portal-panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.portal-panel-head h2,.portal-side h2{margin:3px 0 12px;font-size:19px}
+.portal-panel-head>a{font-size:13px}
+.portal-record{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #e7eeee;text-decoration:none;color:#234751}
+.portal-record div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.portal-record strong{font-size:14px}
+.portal-record span{font-size:12px;color:#748a90}
+.portal-record>span{flex:none}
+.portal-empty{padding:24px;color:#667e83;font-size:13px}
+.portal-side{display:grid;gap:16px}
+.portal-side p{font-size:13px}
+.portal-notice{padding:10px;background:#eef9f5;border-radius:8px}
+.portal-task{display:flex;align-items:center;gap:8px;margin:7px 0}
+.portal-safety{font-size:12px;text-align:center;margin:14px 0 0}
+@media(max-width:850px){.portal-top,.portal-columns,.guide-grid,.profile-grid{grid-template-columns:1fr}.monitor-steps{grid-template-columns:1fr}}
+@media(max-width:600px){.app-header .header-links{order:3;width:100%;margin-left:0}.portal-dashboard{padding:12px}.portal-welcome,.portal-summary,.portal-panel{padding:16px}.portal-primary-actions{flex-wrap:wrap}.portal-record{align-items:flex-start;flex-direction:column}.family-page{padding:14px}}
+.monitor-title{display:block;margin:0 0 9px;color:#607287;font-size:12px}.monitor-title input{width:min(100%,420px);padding:8px;margin-top:4px}
+
+.header-links a { display: inline-flex; align-items: center; gap: 5px; }
+.header-links svg { width: 16px; height: 16px; flex: none; }
+.guide-models { margin-top: 24px; padding: 24px; border: 1px solid #d7e5e5; border-radius: 14px; background: #fff; }
+.guide-models h2 { margin-top: 0; }
+.guide-model-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.guide-model-list article { padding: 16px; border: 1px solid #dce9e8; border-radius: 12px; background: #f7fbfb; }
+.guide-model-list h3 { margin: 0 0 7px; font-size: 1rem; }
+.guide-model-list p { margin: 0; }
+@media (max-width: 700px) { .guide-model-list { grid-template-columns: 1fr; } }
+
+
+.records-view-tabs { display: flex; gap: 8px; padding: 5px; margin: 12px 0 16px; width: fit-content; border-radius: 12px; background: #edf4f5; }
+.records-view-tabs button { border: 0; border-radius: 9px; padding: 9px 20px; color: #375b61; background: transparent; font-weight: 700; cursor: pointer; }
+.records-view-tabs button.selected { color: #0d4f55; background: #fff; box-shadow: 0 1px 5px #20494f22; }
+
+/* Consistent page shell, manual chapters, and readable detail navigation. */
+.app-header .header-links svg{display:block;width:17px;height:17px;flex:none;background:transparent;border:0;border-radius:0;box-shadow:none}
+body:has(.family-page) main,body:has(.guide-page) main{max-width:1260px;margin:10px auto;padding:0 22px}
+body:has(.family-page) nav,body:has(.guide-page) nav{margin:10px 0 14px}
+.family-page,.guide-page{margin:10px 0;padding:22px 24px;background:#fff;border:1px solid #d8e4e2;border-radius:16px;box-shadow:0 8px 30px #123f4608}
+.family-page>p,.guide-page>p{margin:6px 0 16px}
+.family-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:16px}
+.family-panel{min-width:0;margin:0;padding:18px 20px;border:1px solid #dce8e6;border-radius:12px;background:#f8fbfa}
+.family-panel h2{margin:0 0 12px;font-size:17px}
+.family-panel form{align-items:end}
+.family-panel form input{width:min(100%,300px)}
+.family-notifications{grid-column:1/-1}
+.guide-toc{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:18px 0;padding:11px 14px;border:1px solid #dce8e6;border-radius:10px;background:#f7faf9}
+.guide-toc strong{margin-right:10px;color:#264e52;font-size:13px}
+.guide-toc a{padding:6px 11px;border-radius:7px;color:#1a6f68;text-decoration:none;font-size:13px}
+.guide-toc a:hover{background:#e2efeb}
+.guide-chapter-heading{margin:25px 0 12px;padding-bottom:9px;border-bottom:1px solid #dae7e4;color:#183f45;font-size:20px;scroll-margin-top:16px}
+.guide-grid{display:grid;grid-template-columns:1fr;gap:0;margin:0}
+.guide-grid article{display:grid;grid-template-columns:45px 1fr;gap:0 15px;margin:0;padding:17px 2px;border:0;border-bottom:1px solid #e5eeeb;border-radius:0;background:#fff}
+.guide-grid article>span{grid-row:1/4;display:flex;align-items:flex-start;justify-content:center;padding-top:4px;color:#238779;font-size:15px}
+.guide-grid article h2{margin:0 0 5px;font-size:16px}
+.guide-grid article p,.guide-grid article a{grid-column:2;margin:4px 0;font-size:13px}
+.guide-models{margin:22px 0 0;padding:20px 0;border:0;border-radius:0;border-top:1px solid #dae7e4;background:#fff;box-shadow:none;scroll-margin-top:16px}
+.guide-models h2{font-size:20px}
+.guide-safety{margin-top:22px;padding:20px;border-radius:12px;scroll-margin-top:16px}
+.records-page:has(.records-overview) .records-overview{grid-template-columns:minmax(0,2fr) minmax(270px,.7fr);gap:16px}
+.records-page:has(.records-overview) .records-trend-panel{min-height:390px;padding:18px 20px}
+.records-page:has(.records-overview) .records-status-grid{gap:12px}
+.records-page:has(.records-overview) .status-card{min-height:186px}
+.records-page:has(.records-overview) .advice-drawer{margin-top:18px}
+.record-back{margin:0 0 14px;padding:5px 0;background:transparent;color:#19786f;font-size:13px;font-weight:650}
+.record-section-tabs{position:sticky;top:0;z-index:4;display:flex;gap:6px;margin:14px 0;padding:6px;border:1px solid #dce8e6;border-radius:11px;background:#f6faf9;box-shadow:0 3px 12px #173f4410}
+.record-section-tabs button{flex:1;padding:9px 12px;background:transparent;color:#42686a;font-size:13px}
+.record-section-tabs button.selected{background:#147b74;color:#fff}
+.record-redesign [hidden]{display:none!important}
+.body-context-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px}
+.body-context-form>h2,.body-context-form>.hint,.body-context-save{grid-column:1/-1}
+.body-context-form>h2{margin:0}
+.body-context-group h3{margin:4px 0 9px;font-size:13px}
+.body-context-options{display:flex;flex-wrap:wrap;gap:7px}
+.body-context-options button{padding:6px 10px;border:1px solid #cbdeda;background:#fff;color:#285d5b;font-size:12px}
+.body-context-options button.selected{background:#dbeee8;border-color:#70b29e;color:#165c4c}
+.body-context-add{display:flex;gap:7px;align-items:center;margin-top:10px}
+.body-context-add input{width:min(100%,260px);margin:0;padding:8px;font-size:12px}
+.body-context-add button{padding:8px 10px;font-size:12px}
+@media(max-width:760px){.family-sections,.body-context-form{grid-template-columns:1fr}.family-notifications{grid-column:auto}.guide-grid article{grid-template-columns:30px 1fr}.record-section-tabs{overflow-x:auto}.record-section-tabs button{white-space:nowrap}.records-page:has(.records-overview) .records-overview{grid-template-columns:1fr}}
+/* Unified application shell: the same width, type scale and surfaces on every signed-in page. */
+:root{--app-bg:#f4f6f9;--app-surface:#fff;--app-card:#f7fafb;--app-border:#dce6eb;--app-ink:#183e48;--app-muted:#526e74;--app-accent:#147b74}
+body:has(#root>main){background:var(--app-bg)}
+body:has(#root>main) #root>main{width:calc(100% - 44px);max-width:1440px;margin:12px auto;padding:0}
+.app-header{padding:12px max(22px,calc((100vw - 1440px)/2));min-height:64px}
+.app-header strong{font-size:20px}
+#root>main>nav{gap:6px;margin:6px 0 12px}
+#root>main>nav a{padding:7px 10px;font-size:14px}
+#root>main>.dashboard-page,#root>main>.live-monitor-page,#root>main>.upload-page,#root>main>.records-page,#root>main>.family-page,#root>main>.guide-page,#root>main>.profile-page,#root>main>.record-page{width:100%;max-width:none;margin:0 auto;padding:22px 24px!important;border:1px solid var(--app-border);border-radius:16px;background:var(--app-surface);box-shadow:0 8px 28px #152d3d0a}
+#root>main>.dashboard-page{background:#f7fafb}
+#root>main>.live-monitor-page{background:#fff}
+#root>main>.profile-page>.eyebrow,#root>main>.guide-page>.eyebrow,#root>main>.family-page>.eyebrow,#root>main>.upload-page>.eyebrow,#root>main>.live-monitor-page .eyebrow,#root>main>.records-page .eyebrow{font-size:11px;color:#5b7d7c}
+#root>main>.profile-page>h1,#root>main>.guide-page>h1,#root>main>.family-page>h1,#root>main>.upload-page>h1,#root>main>.records-page .records-heading h1,#root>main>.live-monitor-page h1{margin:4px 0 12px;color:#183e48;font-size:24px;line-height:1.3;font-weight:700}
+#root>main>.profile-page h2,#root>main>.guide-page h2,#root>main>.family-page h2,#root>main>.records-page h2,#root>main>.live-monitor-page h2,#root>main>.upload-page h2{color:#183e48;font-size:17px;line-height:1.4}
+#root>main>.profile-page article,#root>main>.family-page .family-panel,#root>main>.guide-page .guide-model-list article,#root>main>.records-page .records-trend-panel,#root>main>.records-page .status-card,#root>main>.live-monitor-page .monitor-wave-panel{border-color:var(--app-border);border-radius:12px;background:var(--app-card)}
+#root>main>.records-page .records-heading .eyebrow{font-size:11px}
+#root>main>.records-page .records-heading h1{font-size:24px}
+#root>main>.records-page .records-archive .record-title{font-size:14px}
+#root>main>.records-page .records-archive .record-date{font-size:12px}
+#root>main>.records-page .records-filters,#root>main>.records-page .archive-tabs,#root>main>.records-page .records-view-tabs{font-size:13px}
+#root>main>.records-page .record-row{padding:9px 12px;min-height:48px}
+.records-advice-page{padding:14px 0}
+.records-advice-page .history-advice-panel{margin:0;padding:20px;background:#fff}
+.record-primary-actions{align-self:flex-start}
+.record-delete-icon{display:inline-grid!important;place-items:center;width:38px;height:38px;padding:8px!important;border:1px solid #edc4c2!important;background:#fff7f6!important;color:#a63a3a!important}
+.record-delete-icon svg{width:18px;height:18px;background:transparent}
+.record-model-guide{display:block;margin:4px 8px 9px;color:#147b74;font-size:12px;text-decoration:none}
+.record-more-menu .record-model-guide:hover{text-decoration:underline}
+.record-section-tabs{position:static;gap:8px}
+.record-section-tabs button{min-width:0}
+.record-redesign .record-disclosure>h2{margin:0 0 12px;font-size:17px}
+.record-redesign .beat-events{margin:12px 0;padding:12px;border:1px solid #e0e7ed;border-radius:10px;background:#f8fafb}
+.record-redesign .beat-events h3{margin:0 0 10px;font-size:14px}
+.record-origin-note{background:#f7fafb}
+.record-origin-note h2{margin:0 0 8px;font-size:17px}
+.record-origin-note dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:10px 0 0}
+.record-origin-note dl>div{padding:12px;background:#fff;border:1px solid #e1e9eb;border-radius:8px}
+.record-origin-note dt{color:#698580;font-size:12px}
+.record-origin-note dd{margin:6px 0 0;color:#183e48;font-size:14px}
+.profile-reference strong{color:#126b68}
+.profile-reference .profile-reference-ok{padding:10px 12px;border-radius:8px;background:#e9f6ef;color:#1d6b4f}
+.profile-reference a,.monitor-model-guide{color:#147b74;font-size:13px;text-decoration:none}
+.monitor-model-guide{display:block;margin:10px 0 0}
+@media(max-width:700px){body:has(#root>main) #root>main{width:calc(100% - 20px)}#root>main>.dashboard-page,#root>main>.live-monitor-page,#root>main>.upload-page,#root>main>.records-page,#root>main>.family-page,#root>main>.guide-page,#root>main>.profile-page,#root>main>.record-page{padding:14px!important}.record-section-tabs{overflow-x:auto}.record-section-tabs button{white-space:nowrap}.record-origin-note dl{grid-template-columns:1fr}}
+
+#root>main>.record-page h1{font-size:24px;line-height:1.3;color:#183e48}
+#root>main>.record-page h2{font-size:17px;line-height:1.4;color:#183e48}
+
+/* Shared title position and compact record actions. */
+#root>main>.family-page,#root>main>.live-monitor-page{padding-top:22px!important}
+#root>main>.family-page>.eyebrow{margin:0 0 4px}
+#root>main>.family-page>h1{margin:4px 0 12px}
+.monitor-page-eyebrow{margin:0 0 4px}
+#root>main>.live-monitor-page>.monitor-page-title{margin:4px 0 12px}
+.live-monitor-page .monitor-heading h2{margin:2px 0;font-size:17px}
+.record-top-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 14px}
+.record-top-actions .record-back{margin:0}
+.record-top-actions .record-delete-icon{display:inline-flex!important;align-items:center;justify-content:center;gap:7px;width:auto;height:auto;padding:5px 0!important;border:0!important;background:transparent!important;color:#b13d3d!important;font-size:13px;font-weight:650}
+.record-top-actions .record-delete-icon svg{width:15px;height:15px}
+.record-model-tag{display:inline-block;margin-left:8px;padding:2px 7px;border-radius:6px;background:#e9f3f2;color:#256c66;font-size:11px;white-space:nowrap}
+.profile-reference .profile-average{margin:8px 0 16px}

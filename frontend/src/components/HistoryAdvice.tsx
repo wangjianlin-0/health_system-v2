@@ -99,7 +99,7 @@ export default function HistoryAdvice({refresh}: {refresh: number}) {
           <details>
             <summary>查看相关记录（{item.evidence_records.length}）</summary>
             <ul>{item.evidence_records.map(record => <li key={record.id}>
-              <Link to={`/records/${record.id}`}>{record.date} · {record.id.slice(0, 8)}</Link>
+              <Link to={`/records/${record.id}`}>{record.date} · 查看记录</Link>
             </li>)}</ul>
           </details>
         </article>)}

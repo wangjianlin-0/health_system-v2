@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import './recordDetail.css';
-import BodyContextForm from './BodyContextForm';
+import BodyContextForm, {formatBodyContext} from './BodyContextForm';
 import EcgImageExport from './EcgImageExport';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AnalysisTask, RecordDetail as RecordDetailType,
-  downloadFile, post, request,
+  downloadFile, post, recordSourceLabel, request,
 } from '../../services/api';
 import Waveform from '../../components/Waveform';
 import { OutcomeBadge, OwnerTag, QualityBadge } from '../../components/badges';
+
+export function modelDisplay(version?: string | null, requested?: string | null): string {
+  const value = (version || requested || '').toLowerCase();
+  if (value.includes('ensemble')) return 'CNN + HGB 复核';
+  if (value.includes('openecg')) return 'OpenECG';
+  if (value.includes('hgb')) return 'HGB v92';
+  if (value.includes('cnn')) return 'CNN H27';
+  if (value === 'none' || value.includes('signal')) return '仅信号检查';
+  return '未获得模型结果';
+}
 
 function dash(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -95,7 +105,11 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const [actionError, setActionError] = useState('');
   const [reanalyzing, setReanalyzing] = useState(false);
   const [nextModel, setNextModel] = useState('');
+  const [page, setPage] = useState<'summary' | 'beats' | 'quality' | 'notes'>('summary');
   const [note, setNote] = useState(record.note ?? '');
+  const [title, setTitle] = useState(record.title);
+  const [titleSaving, setTitleSaving] = useState(false);
+  const [titleMessage, setTitleMessage] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteMessage, setNoteMessage] = useState('');
   const duration = result.duration_sec ?? 0;
@@ -106,8 +120,11 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const [beatLimit, setBeatLimit] = useState(30);
 
   useEffect(() => {
+    setPage('summary');
     setNote(record.note ?? '');
     setNoteMessage('');
+    setTitle(record.title);
+    setTitleMessage('');
   }, [record.id, record.note]);
 
   useEffect(() => {
@@ -154,6 +171,22 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       setActionError((caught as Error).message);
     } finally {
       setReanalyzing(false);
+    }
+  }
+
+  async function saveTitle() {
+    setTitleSaving(true);
+    setTitleMessage('');
+    try {
+      const updated = await request<RecordDetailType>('/records/' + record.id + '/title', {
+        method: 'PATCH', body: JSON.stringify({title}),
+      });
+      setTitle(updated.title);
+      setTitleMessage('名称已保存');
+    } catch (caught) {
+      setTitleMessage((caught as Error).message);
+    } finally {
+      setTitleSaving(false);
     }
   }
 
@@ -204,17 +237,16 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const respirationAvailable = respirationAnalysis?.rate_bpm != null;
   const bpm = prediction.heart_rate?.bpm ?? record.heart_rate_bpm ?? null;
   const metadata: [string, string][] = [
-    ['记录 ID', record.id],
-    ['任务 ID', dash(record.task_id)],
-    ['来源', dash(record.source)],
-    ['导联', dash(record.lead)],
+    ['记录名称', title],
+    ['来源', recordSourceLabel(record.source)],
+    ['导联', record.lead === 'user_single_lead' ? '单导联' : dash(record.lead)],
     ['单位', dash(record.unit)],
     ['采样率', record.sample_rate_hz == null ? '—' : `${record.sample_rate_hz} Hz`],
     ['时长', record.duration_sec == null ? '—' : `${record.duration_sec.toFixed(2)} s`],
     ['点数', dash(record.n_samples)],
     ['处理版本', dash(record.processing_version)],
     ['模型版本', dash(record.model_version)],
-    ['结果状态', prediction.status],
+    ['结果状态', prediction.status === 'classified' ? '已分类' : prediction.status === 'model_unavailable' ? '未获得分类' : prediction.status],
   ];
   const qualityReasonLabels: Record<string, string> = {
     record_too_short: '记录时长过短',
@@ -237,11 +269,20 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   return <article className="record-detail record-redesign">
     {imageExport && <EcgImageExport record={record} start={appliedWindow.start}
       end={appliedWindow.end} onClose={() => setImageExport(false)} />}
+    <div className="record-top-actions"><button className="record-back" type="button" onClick={onBack}>← 返回记录列表</button>
+      {owned && <button className="record-delete-icon" type="button" disabled={deleting} onClick={onDelete}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6m4-6v6" /></svg>删除记录</button>}
+    </div>
     <header className="record-hero">
       <div className="record-heading">
         <p className="eyebrow">ECG / 心电记录</p>
-        <h1>心电记录分析</h1>
-        <p className="record-date">{timeText(record.created_at)} <span>·</span> {duration.toFixed(2)} 秒 <span>·</span> {result.sample_rate_hz} Hz</p>
+        <h1>{title}</h1>
+        {owned && <div className="record-rename">
+          <label>修改记录名称<input maxLength={80} value={title} onChange={event => setTitle(event.target.value)}
+            placeholder="留空则恢复默认名称" /></label>
+          <button className="secondary" disabled={titleSaving} onClick={() => void saveTitle()}>保存名称</button>
+          <span role="status">{titleMessage}</span>
+        </div>}
+        <p className="record-date">{timeText(record.created_at)} <span>·</span> {duration.toFixed(2)} 秒 <span>·</span> {result.sample_rate_hz} Hz <span>·</span> 分析模型：{modelDisplay(record.model_version, prediction.beat_model?.requested)}</p>
       </div>
       <div className="record-primary-actions">
         <button disabled={!result.waveform?.length} onClick={() => setImageExport(true)}>导出心电图片</button>
@@ -254,15 +295,22 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
             {owned && <><label>重新分析使用的模型<select value={nextModel} onChange={event => setNextModel(event.target.value)}>
               <option value="">沿用原模型</option><option value="cnn">CNN H27</option><option value="hgb">HGB v92</option><option value="openecg">OpenECG</option><option value="none">仅信号检查</option>
             </select></label>
+            <Link className="record-model-guide" to="/guide#guide-models">如何选择分析模型？</Link>
             <button disabled={reanalyzing} onClick={() => void reanalyze()}>{reanalyzing ? '提交中…' : '重新分析'}</button></>}
-            <button onClick={onBack}>返回记录列表</button>
-            {owned && <button className="record-delete" disabled={deleting} onClick={onDelete}>删除记录</button>}
+
           </div>
         </details>
       </div>
     </header>
     {actionError && <p className="notice notice-error" role="alert">{actionError}</p>}
     {!owned && <p className="notice">这条记录由 {record.owner_username ?? '其他用户'} 共享，仅可查看。</p>}
+    <nav className="record-section-tabs" aria-label="记录详情分段">
+      <button type="button" className={page === 'summary' ? 'selected' : ''} onClick={() => setPage('summary')}>测量概览与波形</button>
+      <button type="button" className={page === 'beats' ? 'selected' : ''} onClick={() => setPage('beats')}>心拍与节律</button>
+      <button type="button" className={page === 'quality' ? 'selected' : ''} onClick={() => setPage('quality')}>质量与解读</button>
+      <button type="button" className={page === 'notes' ? 'selected' : ''} onClick={() => setPage('notes')}>状况与备注</button>
+    </nav>
+    <div hidden={page !== 'summary'}>
     <div className="record-status">
       <OutcomeBadge outcome={prediction.status} />
       <QualityBadge status={quality.status} />
@@ -296,21 +344,25 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       <p className="record-wave-note">{filtered ? '离线节律滤波用于辅助观察，原始数据保留，可随时切换。' : '来自本次上传记录，可切换滤波波形对照查看。'}</p>
     </section>
 
+    </div>
+    <div hidden={page !== 'beats'}>
     {beatAnalysis && <section className="record-beats" aria-label="心拍分类">
       <div className="record-panel-head"><div><p className="eyebrow">BEATS / 逐拍分析</p><h2>心拍分类</h2></div><span className="hint">共 {beatAnalysis.total} 拍</span></div>
       <dl className="record-beat-grid">{beatClasses.map(item => <div key={item.key} className={item.key === 'unknown' ? 'unclassified' : ''}>
         <dt><span className="beat-class-code">{item.code}</span>{item.label}</dt><dd>{hasBeatClassification ? beatAnalysis.counts[item.key] ?? 0 : '—'}<span>拍</span></dd>
       </div>)}</dl>
       <p className="hint">{hasBeatClassification ? '心拍类别为模型输出，不代表整段心电正常或疾病诊断。未分类心拍不自动计入正常类。' : '本次未获得心拍分类结果。'}</p>
-      {beatAnalysis.events?.length > 0 && <details className="beat-events"><summary>查看逐拍结果 <span>{beatAnalysis.events.length} 条</span></summary>
+      {beatAnalysis.events?.length > 0 && <div className="beat-events"><h3>逐拍结果 · {beatAnalysis.events.length} 条</h3>
         <div className="beat-table-scroll"><table><thead><tr><th>序号</th><th>时间 / 秒</th><th>类别</th><th>模型概率</th><th>原始标签</th></tr></thead><tbody>{beatAnalysis.events.slice(0, beatLimit).map((event, index) => <tr key={index}><td>{index + 1}</td><td>{event.time_sec?.toFixed(3) ?? '—'}</td><td>{className(event.label)}</td><td>{event.confidence == null ? '未提供' : `${(event.confidence * 100).toFixed(1)}%`}</td><td>{event.raw_label ?? '—'}</td></tr>)}</tbody></table></div>
         <p className="hint">模型概率是单个心拍类别的输出概率，不是诊断准确率。</p>
         {beatLimit < beatAnalysis.events.length && <button className="secondary" onClick={() => setBeatLimit(value => value + 100)}>显示更多心拍</button>}
-      </details>}
-      {beatAnalysis.limitations?.length ? <details className="beat-events"><summary>模型适用范围</summary><ul>{beatAnalysis.limitations.map(item => <li key={item}>{item}</li>)}</ul></details> : null}
+      </div>}
+      {beatAnalysis.limitations?.length ? <div className="beat-events"><h3>模型适用范围</h3><ul>{beatAnalysis.limitations.map(item => <li key={item}>{item}</li>)}</ul></div> : null}
     </section>}
 
-    <details className="record-disclosure"><summary>信号质量与心率细节 <span>{readable(quality.grade)}</span></summary><div className="disclosure-body">
+    </div>
+    <div hidden={page !== 'quality'}>
+    <section className="record-disclosure"><h2>信号质量与心率细节 · {readable(quality.grade)}</h2><div className="disclosure-body">
         {quality.grade && <p>质量等级：<strong>{readable(quality.grade)}</strong></p>}
         {quality.metrics && <div className="quality-metrics">
           <span>基线漂移：{readable(quality.metrics.baseline_wander?.level)}
@@ -334,7 +386,7 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
 
       {rateAnalysis && <p>估算心率范围：{rateAnalysis.min_bpm ?? '—'}–{rateAnalysis.max_bpm ?? '—'} 次/分；RR 平均间期：{rrMeanMs ?? '—'} ms；规则性：{readable(regularity)}。</p>}
       <p className="hint">通过基础检查仅表示满足当前工程规则，不代表医疗设备验证或诊断结论。</p>
-    </div></details>
+    </div></section>
     <div className="record-availability">
       <span>整段节律分析 <strong>{rhythmAvailable ? readable(rhythmAnalysis?.primary) : '未获得结果'}</strong></span>
       <span>呼吸分析 <strong>{respirationAvailable ? `${respirationAnalysis?.rate_bpm} 次/分` : '未获得结果'}</strong></span>
@@ -344,11 +396,11 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
         <p>{respirationAvailable ? `呼吸分析器：${respirationAnalysis?.provider}；周期 ${respirationAnalysis?.cycle_count ?? 0}；长间隔 ${respirationAnalysis?.pause_candidates.length ?? 0}。` : respirationAnalysis?.fallback_reason ?? '未产生呼吸率；请确认输入是否提供呼吸通道及分析器是否可用。'}</p>
       </details>}
     </div>
-    <details className="record-disclosure"><summary>记录来源与技术参数</summary><div className="disclosure-body">
+    <section className="record-disclosure"><h2>记录来源与技术参数</h2><div className="disclosure-body">
       <OwnerTag name={record.owner_username} />
       <dl className="meta-grid">{metadata.map(([label, value]) => <div key={label}><dt>{label}</dt><dd className="mono-sm">{value}</dd></div>)}</dl>
-      {record.supersedes_record_id && <p className="hint">由记录 <Link to={'/records/' + record.supersedes_record_id}>{record.supersedes_record_id}</Link> 重新分析得到。</p>}
-    </div></details>
+      {record.supersedes_record_id && <p className="hint">由记录 <Link to={'/records/' + (record.root_record_id ?? record.supersedes_record_id)}>{record.root_record_title ?? '最初记录'}</Link> 重新分析得到；测量状况和备注以最初记录为准。</p>}
+    </div></section>
     {modelMissing && <div className="notice notice-info">
       <strong>本次只完成了信号检查，没有做 AI 分类。</strong>
       <p>{prediction.explanation || '当前后端没有加载分类模型，未产生标签、心率和心拍统计。'}</p>
@@ -362,8 +414,8 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     {!modelMissing && prediction.status !== 'skipped_quality' && !prediction.label &&
       <p className="notice">{prediction.explanation || '本记录未产生分类结论。'}</p>}
 
-    {detail && !modelMissing && <details className="record-disclosure explanation">
-      <summary>结果解读与下一步建议</summary><div className="disclosure-body">
+    {detail && !modelMissing && <section className="record-disclosure explanation">
+      <h2>结果解读与下一步建议</h2><div className="disclosure-body">
       {elderlySummary && <div className="plain-summary">
         <span>先看结论</span><p>{elderlySummary}</p>
       </div>}
@@ -380,11 +432,15 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       {detail.evidence?.length ? <><h3>分析依据</h3><ul>{detail.evidence.map(item => <li key={item}>{item}</li>)}</ul></> : null}
       {detail.next_steps?.length ? <><h3>下一步建议</h3><ul>{detail.next_steps.map(item => <li key={item}>{item}</li>)}</ul></> : null}
       {detail.provider && <small>解释引擎：{detail.provider === 'deepseek' ? 'DeepSeek 大模型' : '本地模板'}</small>}
-    </div></details>}
+    </div></section>}
 
-    {owned && !record.supersedes_record_id && <BodyContextForm key={record.id} id={record.id}
-      context={record.body_context} />}
-    {owned ? <section className="note-editor">
+    </div>
+    <div hidden={page !== 'notes'}>
+    {record.root_record_id ? <section className="record-origin-note"><h2>测量时的身体状况</h2>
+      <p>此记录沿用最初测量时填写的信息。<Link to={'/records/' + record.root_record_id}>查看并编辑最初记录 →</Link></p>
+      <dl><div><dt>当时在做什么</dt><dd>{formatBodyContext(record.body_context?.scene, 'scene')}</dd></div><div><dt>当时的感受</dt><dd>{formatBodyContext(record.body_context?.feeling, 'feeling')}</dd></div></dl>
+    </section> : owned && <BodyContextForm key={record.id} id={record.id} context={record.body_context} />}
+    {owned && !record.root_record_id ? <section className="note-editor">
       <h2>我的备注</h2>
       <textarea value={note} maxLength={500} rows={3} placeholder="例如：测量时间、服药情况、当时感受"
                 onChange={event => {setNote(event.target.value); setNoteMessage('');}} />
@@ -399,5 +455,6 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       <p>{record.note}</p>
     </section> : null}
 
+    </div>
   </article>;
 }

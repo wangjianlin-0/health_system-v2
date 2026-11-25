@@ -8,6 +8,8 @@ import Analyze from './pages/Analyze';
 import Records from './pages/Records';
 import Family from './pages/Family';
 import Monitor from './pages/Monitor';
+import Profile from './pages/Profile';
+import Guide from './pages/Guide';
 
 export default function App() {
   const [signedIn, setSignedIn] = useState(Boolean(sessionStorage.getItem('ecg_token')));
@@ -17,6 +19,8 @@ export default function App() {
     <Route path="/monitor" element={<Monitor />} />
     <Route path="/" element={<Dashboard />} /><Route path="/analyze" element={<Analyze />} />
     <Route path="/records" element={<Records />} /><Route path="/records/:id" element={<Analyze />} />
-    <Route path="/family" element={<Family />} /><Route path="*" element={<Navigate to="/" replace />} />
+    <Route path="/family" element={<Family />} />
+    <Route path="/profile" element={<Profile />} />
+    <Route path="/guide" element={<Guide />} /><Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Layout>;
 }
