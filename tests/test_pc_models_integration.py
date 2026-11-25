@@ -27,8 +27,17 @@ def test_real_cnn_hgb_upload_and_reanalysis(client):
     assert 'H27' in result['model_version']
     response = client.post(f"/api/v1/records/{result['id']}/reanalyze", headers=headers, json={'model_type': 'hgb'})
     next_result = wait_task(client, headers, response.json()['id'], timeout=40)['record']
-    assert next_result['result']['prediction']['beats']['by_type'] == dict(N=57, S=8, VF=7)
+    # The multimodel API normalizes HGB N/S/VF into the shared beat schema;
+    # the detector's one boundary event remains explicitly unclassified.
+    assert next_result['result']['prediction']['beats']['by_type'] == dict(
+        normal=57, pac=8, vpc=7, fusion=0, paced=0, unknown=1)
     assert next_result['supersedes_record_id'] == result['id']
     detail = client.get('/api/v1/records/' + next_result['id'], headers=headers).json()
     assert len(detail['result']['waveform']) == 30000
-    assert detail['result']['prediction']['beats']['items'][1]['probabilities']
+    events = detail['result']['beat_analysis']['events']
+    classified = [event for event in events if event['label'] != 'unknown']
+    assert len(events) == 73 and len(classified) == 72
+    assert all(event['source'] == 'edge_hgb' for event in classified)
+    assert all(event['raw_label'] in ('N', 'S', 'VF') for event in classified)
+    assert all(0 <= event['confidence'] <= 1 for event in classified)
+    assert events == next_result['result']['beat_analysis']['events']

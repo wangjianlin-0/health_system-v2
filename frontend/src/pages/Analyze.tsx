@@ -101,7 +101,7 @@ export default function Analyze() {
   }
 
   if (id) {
-    return <section>
+    return <section className="record-page">
       <p className="eyebrow">记录与分析</p>
       {recordError && <div className="notice notice-error" role="alert">
         <p>{recordError}</p>
