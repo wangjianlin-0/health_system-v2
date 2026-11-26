@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './recordDetail.css';
 import BodyContextForm, {formatBodyContext} from './BodyContextForm';
 import EcgImageExport from './EcgImageExport';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  AnalysisTask, BeatEvent, RecordDetail as RecordDetailType,
+  AnalysisTask, RecordDetail as RecordDetailType,
   downloadFile, post, recordSourceLabel, request,
 } from '../../services/api';
 import Waveform from '../../components/Waveform';
@@ -34,17 +34,6 @@ function timeText(value: string): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
-
-function beatTime(event: BeatEvent, sampleRate: number): number | null {
-  if (typeof event.time_sec === 'number' && Number.isFinite(event.time_sec)) return event.time_sec;
-  if (typeof event.sample === 'number' && Number.isFinite(event.sample) && sampleRate > 0) {
-    return event.sample / sampleRate;
-  }
-  return null;
-}
-
-type LocatedBeat = {index: number; time: number};
-type BeatInspection = {current: LocatedBeat; previous: LocatedBeat | null};
 
 function rrFromSavedBeats(events: NonNullable<RecordDetailType['result']['beat_analysis']>['events'],
                           sampleRateHz: number) {
@@ -129,17 +118,6 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const [appliedWindow, setAppliedWindow] = useState({start: 0, end: Math.min(10, duration)});
   const [filtered, setFiltered] = useState(false);
   const [beatLimit, setBeatLimit] = useState(30);
-  const [inspection, setInspection] = useState<BeatInspection | null>(null);
-  const waveHeading = useRef<HTMLHeadingElement>(null);
-  const beatTable = useRef<HTMLDivElement>(null);
-  const pendingFocus = useRef<'summary' | 'beats' | null>(null);
-  const sampleRate = result.sample_rate_hz;
-  const lastSampleTime = result.waveform?.length && sampleRate > 0
-    ? (result.waveform.length - 1) / sampleRate : -1;
-  const locatedBeats = useMemo(() => (beatAnalysis?.events ?? []).flatMap((event, index) => {
-    const time = beatTime(event, sampleRate);
-    return time !== null && time >= 0 && time <= lastSampleTime ? [{index, time}] : [];
-  }).sort((a, b) => a.time - b.time || a.index - b.index), [beatAnalysis?.events, sampleRate, lastSampleTime]);
 
   useEffect(() => {
     setPage('summary');
@@ -156,18 +134,7 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     setAppliedWindow({start: 0, end});
     setFiltered(false);
     setBeatLimit(30);
-    setInspection(null);
-    pendingFocus.current = null;
   }, [record.id, record.result.duration_sec]);
-
-  useEffect(() => {
-    if (pendingFocus.current !== page) return;
-    pendingFocus.current = null;
-    const target = page === 'summary' ? waveHeading.current
-      : beatTable.current?.querySelector<HTMLButtonElement>(`button[data-beat-index="${inspection?.current.index}"]`);
-    target?.focus({preventScroll: true});
-    target?.scrollIntoView({block: 'nearest'});
-  }, [page, inspection]);
 
   async function exportAs(format: 'csv' | 'json') {
     setExporting(format);
@@ -249,54 +216,19 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       return;
     }
     setActionError('');
-    setInspection(null);
     setWindowStart(start); setWindowEnd(end); setAppliedWindow({start, end});
   }
 
   function resetWindow() {
     setActionError(''); setWindowStart(0); setWindowEnd(duration);
-    setInspection(null);
     setAppliedWindow({start: 0, end: duration});
   }
 
-  function inspectBeat(index: number) {
-    const position = locatedBeats.findIndex(beat => beat.index === index);
-    if (position === -1) return;
-    const current = locatedBeats[position];
-    // A duplicate timestamp cannot serve as the preceding R peak.
-    let previousPosition = position - 1;
-    while (previousPosition >= 0 && locatedBeats[previousPosition].time === current.time) {
-      previousPosition--;
-    }
-    const previous = locatedBeats[previousPosition] ?? null;
-    const firstTime = previous?.time ?? current.time;
-    const width = Math.max(4, current.time - firstTime + 2);
-    const start = Math.max(0, Math.min((firstTime + current.time - width) / 2, duration - width));
-    const end = Math.min(duration, start + width);
-
-    setActionError('');
-    setWindowStart(Number(start.toFixed(3)));
-    setWindowEnd(Number(end.toFixed(3)));
-    setAppliedWindow({start, end});
-    setInspection({current, previous});
-    pendingFocus.current = 'summary';
-    setPage('summary');
-  }
-
-  function returnToBeat() {
-    pendingFocus.current = 'beats';
-    setPage('beats');
-  }
-
   const sourceValues = (filtered ? result.waveform_processed_mV : result.waveform) ?? [];
+  const sampleRate = result.sample_rate_hz;
   const startSample = Math.floor(appliedWindow.start * sampleRate);
   const endSample = Math.min(sourceValues.length, Math.ceil(appliedWindow.end * sampleRate));
   const visibleValues = sourceValues.slice(startSample, endSample);
-  const rrInterval = inspection?.previous
-    ? {start: inspection.previous.time, end: inspection.current.time} : undefined;
-  const markers = inspection ? [inspection.previous, inspection.current].flatMap(beat => beat ? [{
-    time_sec: beat.time, label: `第 ${beat.index + 1} 拍`, kind: 'selected' as const,
-  }] : []) : [];
   const unknownCount = beatAnalysis?.counts.unknown ?? 0;
   const classifiedCount = Object.entries(beatAnalysis?.counts ?? {})
     .reduce((sum, [key, count]) => sum + (key === 'unknown' ? 0 : count), 0);
@@ -388,33 +320,21 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       ? `已完成 ${classifiedCount} 拍分类，${unknownCount} 拍未分类，可结合原始波形复核。`
       : '已保存心电记录，请结合信号质量与分析状态查看结果。'}</p>
     {safety && safety.level !== 'reference_only' && <div className={`notice ${safety.urgent ? 'notice-error' : ''}`} role="status"><strong>{readable(safety.level)}</strong><p>{safety.message}</p>{safety.reasons?.length > 0 && <ul>{safety.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}</div>}
-    <dl className="record-metrics record-metrics-with-rr">
+    <dl className="record-metrics">
       <div><dt>估算心率</dt><dd>{bpm == null ? '—' : Number(bpm.toFixed(2))}<span>次/分</span></dd><small>基于本次心电信号估算</small></div>
       <div><dt>检测心拍</dt><dd>{beatAnalysis?.total ?? prediction.beats?.count ?? '—'}<span>拍</span></dd><small>{hasBeatClassification ? `${classifiedCount} 拍已分类 · ${unknownCount} 拍未分类` : '分类状态见下方说明'}</small></div>
       <div><dt>信号质量</dt><dd>{quality.score ?? '—'}<span>分</span></dd><small>工程评分 · 不等同临床有效性</small></div>
-      <div><dt>心律规则性</dt><dd>{readable(regularity)}</dd><small>{rrMeanMs == null ? 'RR 平均间期未提供' : `平均 RR · ${Math.round(rrMeanMs)} ms`}</small></div>
+      <div><dt>心律规则性</dt><dd>{readable(regularity)}<span>{rrMeanMs == null ? '' : ' · ' + Math.round(rrMeanMs) + ' ms'}</span></dd><small>RR 间期辅助统计</small></div>
     </dl>
 
     <section className="record-wave-panel" aria-label="真实心电波形">
-      <div className="record-panel-head"><div><p className="eyebrow">SIGNAL / 原始记录</p><h2 ref={waveHeading} tabIndex={-1}>心电波形</h2></div>
+      <div className="record-panel-head"><div><p className="eyebrow">SIGNAL / 原始记录</p><h2>心电波形</h2></div>
         <div className="wave-switch" role="group" aria-label="波形类型">
           <button className={!filtered ? 'selected' : ''} aria-pressed={!filtered} onClick={() => setFiltered(false)}>原始波形</button>
           <button className={filtered ? 'selected' : ''} aria-pressed={filtered} disabled={!result.waveform_processed_mV?.length} onClick={() => setFiltered(true)}>滤波波形</button>
         </div>
       </div>
-      {inspection && <div className="beat-inspection">
-        <div role="status">
-          <p className="beat-inspection-interval">{rrInterval ? <>所选 RR 间期 <strong>{Math.round((rrInterval.end - rrInterval.start) * 1000)}</strong> ms</>
-            : '首个可定位心拍 · 无前一拍可比较'}</p>
-          <p className="beat-inspection-points">
-            {inspection.previous && <>第 {inspection.previous.index + 1} 拍 · {inspection.previous.time.toFixed(3)} 秒 <span aria-hidden="true">→</span> </>}
-            第 {inspection.current.index + 1} 拍 · {inspection.current.time.toFixed(3)} 秒
-          </p>
-        </div>
-        <button type="button" className="secondary" onClick={returnToBeat}>返回逐拍结果</button>
-      </div>}
-      <Waveform values={visibleValues} duration={Math.max(0, (visibleValues.length - 1) / sampleRate)}
-                offset={startSample / sampleRate} unit={result.unit ?? 'mV'} markers={markers} beatInterval={rrInterval} />
+      <Waveform values={visibleValues} duration={Math.max(0, (visibleValues.length - 1) / sampleRate)} offset={startSample / sampleRate} unit={result.unit ?? 'mV'} />
       <div className="wave-toolbar">
         <label className="inline">开始 / 秒<input aria-label="波形开始秒数" type="number" min={0} max={duration} step={0.5} value={windowStart} onChange={event => setWindowStart(Number(event.target.value))} /></label>
         <label className="inline">结束 / 秒<input aria-label="波形结束秒数" type="number" min={0} max={duration} step={0.5} value={windowEnd} onChange={event => setWindowEnd(Number(event.target.value))} /></label>
@@ -433,23 +353,7 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       </div>)}</dl>
       <p className="hint">{hasBeatClassification ? '心拍类别为模型输出，不代表整段心电正常或疾病诊断。未分类心拍不自动计入正常类。' : '本次未获得心拍分类结果。'}</p>
       {beatAnalysis.events?.length > 0 && <div className="beat-events"><h3>逐拍结果 · {beatAnalysis.events.length} 条</h3>
-        {locatedBeats.length > 0 && <p className="hint">点时间定位波形，同时查看与前一拍的间隔。</p>}
-        <div ref={beatTable} className="beat-table-scroll"><table><thead><tr>
-          <th>序号</th><th>时间 / 秒</th><th>类别</th><th>模型概率</th><th>原始标签</th>
-        </tr></thead><tbody>{beatAnalysis.events.slice(0, beatLimit).map((event, index) => {
-          const time = beatTime(event, sampleRate);
-          const canLocate = time !== null && time >= 0 && time <= lastSampleTime;
-          return <tr key={index} className={inspection?.current.index === index ? 'located-beat-row' : undefined}>
-            <td>{index + 1}</td>
-            <td>{canLocate ? <button type="button" className="beat-wave-link" data-beat-index={index}
-              aria-label={`定位第 ${index + 1} 拍，${time.toFixed(3)} 秒`} onClick={() => inspectBeat(index)}>
-              {time.toFixed(3)} <span aria-hidden="true">↗</span>
-            </button> : time?.toFixed(3) ?? '—'}</td>
-            <td>{className(event.label)}</td>
-            <td>{event.confidence == null ? '未提供' : `${(event.confidence * 100).toFixed(1)}%`}</td>
-            <td>{event.raw_label ?? '—'}</td>
-          </tr>;
-        })}</tbody></table></div>
+        <div className="beat-table-scroll"><table><thead><tr><th>序号</th><th>时间 / 秒</th><th>类别</th><th>模型概率</th><th>原始标签</th></tr></thead><tbody>{beatAnalysis.events.slice(0, beatLimit).map((event, index) => <tr key={index}><td>{index + 1}</td><td>{event.time_sec?.toFixed(3) ?? '—'}</td><td>{className(event.label)}</td><td>{event.confidence == null ? '未提供' : `${(event.confidence * 100).toFixed(1)}%`}</td><td>{event.raw_label ?? '—'}</td></tr>)}</tbody></table></div>
         <p className="hint">模型概率是单个心拍类别的输出概率，不是诊断准确率。</p>
         {beatLimit < beatAnalysis.events.length && <button className="secondary" onClick={() => setBeatLimit(value => value + 100)}>显示更多心拍</button>}
       </div>}

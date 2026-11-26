@@ -29,7 +29,6 @@
 .record-metrics dd{font-size:36px;line-height:1.2;letter-spacing:-.04em;font-weight:650;margin:8px 0;color:#17675e;font-variant-numeric:tabular-nums}
 .record-metrics dd span{font-size:12px;font-weight:400;letter-spacing:0;margin-left:7px;white-space:nowrap}
 .record-metrics small{font-size:11px;color:#68837c;line-height:1.5}
-.record-metrics.record-metrics-with-rr{grid-template-columns:repeat(4,minmax(0,1fr))}
 .record-redesign section{box-shadow:none;padding:22px;margin:0 0 18px;border:1px solid var(--record-line);border-radius:12px}
 .record-panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .record-panel-head .eyebrow{margin:0 0 6px;font-size:10px;letter-spacing:.1em;color:#76958d}
@@ -62,17 +61,6 @@
 .beat-events table{border-collapse:collapse;width:100%;font-size:12px;text-align:left;white-space:nowrap}
 .beat-events th,.beat-events td{padding:10px;border-bottom:1px solid #e3ede7}
 .beat-events th{position:sticky;top:0;background:#eef5f1;font-weight:500}
-.beat-events .beat-wave-link{padding:6px 9px;background:#e9f5f0;color:#17675e;font-size:12px;font-variant-numeric:tabular-nums}
-.beat-wave-link span{margin-left:5px}
-.beat-events .beat-wave-link:hover,.beat-events .located-beat-row{background:#dff1e9}
-.record-wave-panel h2:focus{outline:none}
-.beat-inspection{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:16px 0 0;padding:12px 14px;border:1px solid #d4e9df;border-radius:8px;background:#edf8f3}
-.beat-inspection p{margin:0}
-.beat-inspection .beat-inspection-interval{font-size:14px;color:#215d53}
-.beat-inspection-interval strong{font-size:25px;font-variant-numeric:tabular-nums;color:#14665a}
-.beat-inspection .beat-inspection-points{font-size:12px;color:#53776f;font-variant-numeric:tabular-nums}
-.beat-inspection-points span{margin:0 4px}
-.beat-inspection button{padding:7px 10px;font-size:12px}
 .record-disclosure{border:1px solid var(--record-line);border-radius:10px;margin-bottom:12px;background:#fff;overflow:hidden}
 .record-redesign .record-disclosure.explanation{padding:0;margin:0 0 12px;background:#fff}
 .record-disclosure>summary{padding:17px 20px;cursor:pointer;font-size:14px;font-weight:500;position:relative}
@@ -101,8 +89,6 @@
   .record-model{width:100%;margin:0}
   .record-summary{font-size:13px;margin:10px 0 16px}
   .record-metrics{padding:16px 0;margin-bottom:16px}
-  .record-metrics.record-metrics-with-rr{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:12px}
-  .record-metrics-with-rr>div:nth-child(odd){border-left:0}
   .record-metrics>div{padding:0 9px}
   .record-metrics dt{font-size:11px}
   .record-metrics dd{font-size:25px;letter-spacing:-.05em}

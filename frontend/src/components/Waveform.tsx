@@ -22,14 +22,13 @@ export function decimate(values: number[], buckets: number): number[] {
   return output;
 }
 
-export default function Waveform({values = [], points, duration, unit, offset = 0, markers = [], beatInterval}: {
+export default function Waveform({values = [], points, duration, unit, offset = 0, markers = []}: {
   values?: number[];
   points?: WaveformPoint[];
   duration: number;
   unit: string;
   offset?: number;
-  markers?: {time_sec: number; label: string; kind?: 'normal' | 'attention' | 'selected'}[];
-  beatInterval?: {start: number; end: number};
+  markers?: {time_sec: number; label: string; kind?: 'normal' | 'attention'}[];
 }) {
   const gridId = useId();
   const fromWindow = Boolean(points && points.length);
@@ -77,7 +76,7 @@ export default function Waveform({values = [], points, duration, unit, offset = 
 
   return <figure>
     <svg viewBox="0 0 1000 240" role="img"
-         aria-label={`心电波形，${offset.toFixed(2)} 到 ${(offset + duration).toFixed(2)} 秒，${source.length} 个绘制点${beatInterval ? `，选中 RR 间期 ${Math.round((beatInterval.end - beatInterval.start) * 1000)} 毫秒` : ''}`}>
+         aria-label={`心电波形，${offset.toFixed(2)} 到 ${(offset + duration).toFixed(2)} 秒，${source.length} 个绘制点`}>
       <defs>
         <pattern id={gridId} width="50" height="40" patternUnits="userSpaceOnUse">
           <path d="M 50 0 L 0 0 0 40" fill="none" stroke="#dce8e3" />
@@ -86,20 +85,9 @@ export default function Waveform({values = [], points, duration, unit, offset = 
       <rect width="1000" height="240" fill={`url(#${gridId})`} />
       <line x1={left} y1={top} x2={left} y2={bottom} stroke="#b9cfca" />
       <line x1={left} y1={bottom} x2={right} y2={bottom} stroke="#b9cfca" />
-      {beatInterval && <g aria-hidden="true" className="wave-rr-bracket">
-        <rect x={xOf(beatInterval.start)} y={top} width={xOf(beatInterval.end) - xOf(beatInterval.start)}
-              height={bottom - top} fill="#127c7212" />
-        <path d={`M ${xOf(beatInterval.start)} 36 V 28 H ${xOf(beatInterval.end)} V 36`}
-              stroke="#17766d" strokeWidth="1.8" fill="none" />
-      </g>}
-      {markers.filter(marker => marker.time_sec >= offset - 1e-8 && marker.time_sec <= offset + duration + 1e-8).map((marker, index) => {
+      {markers.filter(marker => marker.time_sec >= offset && marker.time_sec <= offset + duration).map((marker, index) => {
         const markerX = xOf(marker.time_sec);
         const attention = marker.kind === 'attention';
-        if (marker.kind === 'selected') return <g key={`${marker.time_sec}-${index}`} className="wave-rr-marker" aria-hidden="true">
-          <line x1={markerX} x2={markerX} y1={top} y2={bottom} stroke="#17766d" strokeDasharray="4 4" />
-          <circle cx={markerX} cy={bottom} r="4" fill="#17766d" />
-          <text x={markerX} y={top - 6} textAnchor="middle" fill="#155f58" fontSize="13" fontWeight="600">{marker.label}</text>
-        </g>;
         return <g key={`${marker.time_sec}-${index}`}>
           {attention && <rect x={markerX - 9} y={top} width="18" height={bottom - top}
                               fill="#df46531a" />}
