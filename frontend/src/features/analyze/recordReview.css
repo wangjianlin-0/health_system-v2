@@ -1,0 +1,31 @@
+#root > main > .record-page:has(.analysis-detail-page) {
+  padding: 0 !important;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.record-page:has(.analysis-detail-page) > .eyebrow { display: none; }
+.analysis-detail-page h1 { overflow-wrap: anywhere; }
+.review-record-source { margin: 4px 0; }
+.review-wave-controls { display: flex; flex-wrap: wrap; gap: 7px; }
+.analysis-wave-heading h2:focus { outline: none; }
+.analysis-detail-page .analysis-abnormal-nav { flex-wrap: wrap; }
+.analysis-detail-page .analysis-minimap-wrap input[type="range"] { height: 28px; }
+.analysis-detail-page .analysis-event-table-wrap, .analysis-model-layout > section { min-width: 0; }
+.analysis-detail-page .analysis-event-table-wrap { overflow: auto; }
+.analysis-detail-page .analysis-event-table-wrap .analysis-event-table td { white-space: nowrap; }
+.review-quality { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.review-quality > div { background: #f4f8fa; border-radius: 7px; padding: 8px 10px; }
+.review-quality dd { margin: 3px 0 0; font-weight: 600; }
+.review-rename form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.review-rename input { margin: 0; }
+@media (max-width: 620px) {
+  .analysis-detail-page .analysis-detail-tabs { flex-wrap: wrap; }
+  .analysis-detail-page .analysis-detail-tabs button { white-space: normal; min-width: 90px; min-height: 42px; }
+  .analysis-detail-page .analysis-event-table button, .analysis-abnormal-nav button,
+  .review-wave-controls button { min-height: 40px; }
+  .analysis-detail-head .detail-actions > * { min-height: 40px; }
+  .analysis-detail-page .analysis-wave-review figure > svg { min-height: 0; }
+  .analysis-detail-page .analysis-wave-review .wave-beat-label { display: none; }
+  .review-quality { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

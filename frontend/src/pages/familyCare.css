@@ -1,0 +1,91 @@
+.care-workspace {
+  --care-ink: #21384a;
+  --care-muted: #587080;
+  --care-teal: #26776b;
+  --care-line: #dce7ea;
+  color: var(--care-ink);
+  background: #fafcfd;
+  padding: 20px;
+}
+.care-back, .care-workspace a:not(.button) { color: var(--care-teal); }
+.care-heading, .care-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.care-heading { margin: 14px 0; }
+.care-heading h1, .care-heading p, .care-card h2 { margin: 0; }
+.care-heading p, .care-muted { color: var(--care-muted); }
+.care-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  border: 1px solid var(--care-line);
+  background: #eef3f6;
+  border-radius: 11px;
+  padding: 5px;
+  margin-bottom: 14px;
+}
+.care-tabs button {
+  min-width: 0;
+  padding: 10px 8px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--care-muted);
+}
+.care-tabs button.selected { color: var(--care-teal); background: white; box-shadow: 0 1px 4px #233b531c; }
+.care-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 14px; }
+.care-wave-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.care-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--care-line);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 2px 9px #21384a08;
+  overflow-wrap: anywhere;
+}
+.care-card h2 { font-size: 16px; }
+.care-card h3 { font-size: 14px; }
+.care-actions { justify-content: flex-start; margin: 8px 0; }
+.care-reading { background: #edf7f4; padding: 14px; border-radius: 9px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.care-reading strong { font-size: 32px; color: var(--care-teal); font-variant-numeric: tabular-nums; }
+.care-week, .care-list { list-style: none; padding: 0; margin: 12px 0 0; }
+.care-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.care-week li { text-align: center; padding: 7px 1px; background: #f2f6f7; border-radius: 6px; font-size: 11px; }
+.care-week strong, .care-list small, .care-record-list small { display: block; }
+.care-summary {
+  font: inherit;
+  background: #f5f8fa;
+  border: 1px solid var(--care-line);
+  border-radius: 8px;
+  padding: 12px;
+  white-space: pre-wrap;
+  line-height: 1.65;
+}
+.care-record-list { max-height: 460px; overflow-y: auto; display: grid; gap: 6px; }
+.care-record-list button { background: #f5f8fa; color: var(--care-ink); text-align: left; overflow-wrap: anywhere; }
+.care-record-list button[aria-pressed="true"] { background: #e9f5f0; box-shadow: inset 3px 0 var(--care-teal); }
+.care-metrics { display: flex; flex-wrap: wrap; gap: 10px; }
+.care-metrics div { flex: 1 1 85px; background: #f4f8f9; border-radius: 6px; padding: 6px 9px; }
+.care-metrics dd { margin: 3px 0 0; font-weight: 600; }
+.care-list li { background: #f5f8fa; border: 1px solid var(--care-line); border-radius: 6px; padding: 9px 11px; margin-top: 7px; }
+.care-list li p { margin: 6px 0; white-space: pre-wrap; }
+.care-form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin: 13px 0; }
+.care-form label { flex: 1 1 106px; min-width: 0; margin: 0; }
+.care-form input, .care-form textarea { width: 100%; margin: 4px 0 0; }
+.care-form textarea { min-height: 66px; resize: vertical; }
+.care-check { display: flex; align-items: center; gap: 8px; margin: 0; min-height: 36px; }
+.care-check input { margin: 0; width: 18px; height: 18px; flex: 0 0 auto; }
+.care-feedback { padding: 7px 11px; background: #e9f5f0; color: #216658; border-radius: 6px; }
+.care-workspace button:focus-visible, .care-workspace a:focus-visible { outline: 2px solid var(--care-teal); outline-offset: 2px; }
+@media (max-width: 720px) {
+  .care-workspace { padding: 12px; }
+  .care-grid, .care-wave-grid { grid-template-columns: minmax(0, 1fr); }
+  .care-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .care-tabs button, .care-workspace .button, .care-workspace button { min-height: 44px; }
+  .care-card { padding: 12px; }
+  .care-record-list { max-height: 190px; }
+}

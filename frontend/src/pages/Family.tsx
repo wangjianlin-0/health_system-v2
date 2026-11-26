@@ -66,6 +66,7 @@ export default function Family() {
         </>}
         {incoming && item.status === 'accepted' && <button className="secondary" disabled={busy}
           onClick={() => void act(() => request(`/family/invitations/${item.id}`, {method: 'DELETE'}), '已退出共享')}>退出共享</button>}
+        {item.status === 'accepted' && <Link className="button" to={`/family/care/${item.id}`}>亲属关怀</Link>}
         {!incoming && ['pending', 'accepted'].includes(item.status) && <button className="secondary" disabled={busy}
           onClick={() => void act(() => request(`/family/grants/${item.id}`, {method: 'DELETE'}), '邀请或授权已撤回')}>
           {item.status === 'pending' ? '撤回邀请' : '撤回授权'}</button>}
@@ -75,7 +76,7 @@ export default function Family() {
 
   return <section className="family-page">
     <p className="eyebrow">用户与家庭协同</p><h1>家庭协同</h1>
-    <p>邀请已注册的家属查看你的记录，对方接受后生效。你可以随时撤回共享权限。</p>
+    <p>邀请已注册的家属查看心电记录、协作照护和留言。对方接受后生效，你可以随时撤回授权。</p>
     <div className="family-sections"><article className="family-panel family-invite"><h2>邀请家属</h2><form onSubmit={invite}>
       <label>家属用户名<input required maxLength={80} value={username} onChange={e => setUsername(e.target.value)} /></label>
       <button disabled={busy || !username.trim()}>发送邀请</button>
