@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Analyze from './pages/Analyze';
 import Records from './pages/Records';
 import Family from './pages/Family';
+import FamilyCare from './pages/FamilyCare';
 import Monitor from './pages/Monitor';
 
 export default function App() {
@@ -17,6 +18,8 @@ export default function App() {
     <Route path="/monitor" element={<Monitor />} />
     <Route path="/" element={<Dashboard />} /><Route path="/analyze" element={<Analyze />} />
     <Route path="/records" element={<Records />} /><Route path="/records/:id" element={<Analyze />} />
-    <Route path="/family" element={<Family />} /><Route path="*" element={<Navigate to="/" replace />} />
+    <Route path="/family" element={<Family />} />
+    <Route path="/family/care/:id" element={<FamilyCare />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Layout>;
 }

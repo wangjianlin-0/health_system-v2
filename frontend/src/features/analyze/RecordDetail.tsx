@@ -291,10 +291,6 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     {owned && !record.supersedes_record_id && <BodyContextForm key={record.id} id={record.id}
       context={record.body_context} />}
 
-    <dl className="meta-grid">
-      {metadata.map(([label, value]) => <div key={label}><dt>{label}</dt><dd className="mono-sm">{value}</dd></div>)}
-    </dl>
-
     <div className="analysis-result-cards">
       <div className="analysis-result-primary-row">
       <article className={ventricularBeats > 0 ? 'analysis-result-risk' : 'analysis-result-calm'}>
