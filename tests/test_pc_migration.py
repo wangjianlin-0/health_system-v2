@@ -1,10 +1,14 @@
+import csv
+import io
 import struct
 import time
+from math import pi, sin
+from pathlib import Path
 
 import pytest
 
 from ai_model.inference.edge_adapter import EdgeClassifier
-from hardware.realtime import Acquisition, Frames
+from hardware.realtime import Acquisition, Frames, Session
 from test_api_flow import account, wait_task
 
 
@@ -52,6 +56,8 @@ def test_bluetooth_capture_ownership_and_persistence(tmp_path):
     signal = session.signal()
     assert len(signal['samples']) == 16
     assert signal['samples'][0] == pytest.approx(1234 * 2420 / (6 * 8388608))
+    assert signal['respiration_waveform'] == [1.5, 0.5, -0.5, -1.5] * 4
+    assert signal['respiration_sample_rate_hz'] == 500
     assert signal['acquisition']['source_dropped_samples'] is None
     assert (session.directory / 'capture.bin').read_bytes() == frame() * 4
     assert '8389842' in (session.directory / 'samples.csv').read_text()
@@ -101,24 +107,43 @@ def test_no_empty_session_blocks_reconnection(tmp_path):
 
 
 def test_capture_api_save_once_and_raw_file(client, monkeypatch, tmp_path):
+    from ai_model import pipeline
     from app.api import acquisition as api
+    from app.services.storage import connect
+
     manager = Acquisition()
     monkeypatch.setattr(api, 'acquisition', manager)
-    class Serial:
-        def __init__(self, *_): self.sent = False
-        def read(self, _):
-            if not self.sent:
-                self.sent = True
-                return frame() * 10
-            return b''
-        def close(self): pass
+    monkeypatch.setattr(Session, '_analyze', lambda self: None)
+    model_result = dict(status='classified', label='normal', model_version='test',
+                        heart_rate={'bpm': 75.0})
+    monkeypatch.setattr(pipeline, '_rhythm_prediction', lambda _: dict(model_result))
+    monkeypatch.setattr(pipeline, '_beat_prediction', lambda *_: dict(model_result))
+    sample_count = 15000
+    fixture = (Path(__file__).resolve().parents[1] / 'ai_model' / 'vendor' / 'ecg_edge' /
+               'model' / 'inference' / 'examples' / 'synthetic500.csv')
+    ecg = [float(line) for line in fixture.read_text().splitlines()[:sample_count]]
+    codes = b''.join(
+        struct.pack('>II', 8388608 + round(5000 * sin(2 * pi * index / 2000)),
+                    8388608 + round(value * 6 * 8388608 / 2420))
+        for index, value in enumerate(ecg)
+    )
+    frames = b''.join(b'\xaa\xbb' + codes[i:i + 32] for i in range(0, len(codes), 32))
+
+    class Serial(io.BytesIO):
+        def __init__(self, *_):
+            super().__init__(frames)
+
     owner, other = account(client, 'capture-owner'), account(client, 'capture-other')
     # Obtain the real owner ID through the existing identity service.
     from app.services.family import authenticate
     owner_id = authenticate(owner['Authorization'].split(' ')[1])
     capture = manager.start(owner_id, 'COM9', 115200, 'document_34', 'hgb', tmp_path, serial_factory=Serial)
     sid = capture['id']
-    time.sleep(.05)
+    session = manager.get(owner_id, sid)
+    deadline = time.monotonic() + 5
+    while len(session.values) < sample_count and time.monotonic() < deadline:
+        time.sleep(.01)
+    assert len(session.values) == sample_count
     assert client.get('/api/v1/acquisition/sessions/' + sid, headers=other).status_code == 404
     assert client.post('/api/v1/acquisition/sessions/' + sid + '/save', headers=owner).status_code == 400
     assert client.post('/api/v1/acquisition/sessions/' + sid + '/stop', headers=owner).status_code == 200
@@ -130,7 +155,24 @@ def test_capture_api_save_once_and_raw_file(client, monkeypatch, tmp_path):
     record = task['record']
     assert record['source'] == 'ads1292r_bluetooth'
     assert record['result']['acquisition']['continuity_verified'] is False
-    raw = client.get('/api/v1/records/' + record['id'] + '/raw', headers=owner)
+    assert record['result']['respiration_analysis']['rate_bpm'] == pytest.approx(15.0, abs=0.5)
+    path = '/api/v1/records/' + record['id']
+    raw = client.get(path + '/raw', headers=owner)
     assert raw.status_code == 200
     assert 'resp_raw,ecg_raw' in raw.text
+
+    exported = client.get(path + '/export', headers=owner)
+    assert exported.status_code == 200
+    row = next(csv.DictReader(io.StringIO(exported.text.lstrip('\ufeff'))))
+    assert float(row['heart_rate_bpm']) == 75
+    assert float(row['respiration_rate_bpm']) == record['result']['respiration_analysis']['rate_bpm']
+
+    # Simulate a saved task from before the respiratory channel was forwarded.
+    with connect() as db:
+        db.execute("UPDATE task_inputs SET payload=json_remove(payload, '$.respiration_waveform', "
+                   "'$.respiration_sample_rate_hz', '$.respiration_unit') WHERE task_id=?", (task['id'],))
+    reanalysis = client.post(path + '/reanalyze', headers=owner, json={})
+    assert reanalysis.status_code == 202
+    updated = wait_task(client, owner, reanalysis.json()['id'])['record']
+    assert updated['result']['respiration_analysis'] == record['result']['respiration_analysis']
     manager.shutdown()

@@ -90,6 +90,11 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const regularityText = regularity === 'regular' ? '相对规则' :
     regularity === 'irregular' ? '不规则' : '无法判断';
   const respirationAnalysis = result.respiration_analysis;
+  const respirationSummary = respirationAnalysis?.provider === 'none'
+    ? '本次分析缺少呼吸波形'
+    : respirationAnalysis?.cycle_count == null
+      ? '未生成呼吸周期结果'
+      : `${respirationAnalysis.cycle_count} 个周期 · 长间隔 ${respirationAnalysis.pause_candidates.length}`;
   const safety = result.safety;
   const qualityReasonLabels: Record<string, string> = {
     record_too_short: '记录时长过短',
@@ -380,7 +385,7 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       </article>}
       {respirationAnalysis && <article className="analysis-result-model">
         <span>呼吸阻抗</span><strong>{respirationAnalysis.rate_bpm == null ? '未获得呼吸率' : `${respirationAnalysis.rate_bpm} 次/分`}</strong>
-        <p>{respirationAnalysis.cycle_count ?? 0} 个周期 · 长间隔 {respirationAnalysis.pause_candidates.length}</p>
+        <p>{respirationSummary}</p>
       </article>}
       <article className={`analysis-result-quality-card ${quality.status === 'insufficient' ? 'analysis-result-quality-fail' : ''}`}>
         <span>信号质量 <QualityBadge status={quality.status} /></span>
@@ -523,7 +528,7 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
               {rateAnalysis && <article className="analysis-card"><span className="analysis-kicker">心率与 RR</span><strong>{rateAnalysis.average_bpm == null ? '未获得' : `${rateAnalysis.average_bpm} 次/分`}</strong>
                 <p>规则性：{regularityText}</p><p>平均 RR：{rrMeanMs == null ? '—' : `${rrMeanMs} ms`}</p></article>}
               {respirationAnalysis && <article className="analysis-card"><span className="analysis-kicker">呼吸阻抗</span><strong>{respirationAnalysis.rate_bpm == null ? '未获得呼吸率' : `${respirationAnalysis.rate_bpm} 次/分`}</strong>
-                <p>分析器：{respirationAnalysis.provider}</p><p>周期 {respirationAnalysis.cycle_count ?? 0} · 长间隔 {respirationAnalysis.pause_candidates.length}</p></article>}
+                <p>分析器：{respirationAnalysis.provider}</p><p>{respirationSummary}</p></article>}
               {safety && <article className={`analysis-card safety-${safety.level}`}><span className="analysis-kicker">固定安全规则</span><strong>{safety.level}</strong><p>{safety.message}</p></article>}
             </div>
             {beatAnalysis?.limitations?.map(item => <p className="hint" key={item}>{item}</p>)}

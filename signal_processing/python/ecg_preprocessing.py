@@ -9,6 +9,7 @@ ADS_ZERO = 1 << 23
 ADS_VREF_V = 2.42
 ADS_PGA_GAIN = 6.0
 ADS_LSB_MV = ADS_VREF_V * 1000.0 / (ADS_PGA_GAIN * ADS_ZERO)
+RESPIRATION_FIELDS = ('respiration_waveform', 'respiration_sample_rate_hz', 'respiration_unit')
 
 
 def _ads_raw_to_mv(raw):
@@ -16,6 +17,15 @@ def _ads_raw_to_mv(raw):
     if not math.isfinite(raw) or not raw.is_integer() or not 0 <= raw < 2**24:
         raise ValueError('ADC code must be an integer in [0, 16777215]')
     return (raw - ADS_ZERO) * ADS_LSB_MV
+
+
+def respiration_channel(samples, sample_rate_hz):
+    center = float(np.median(samples))
+    return {
+        'respiration_waveform': [value - center for value in samples],
+        'respiration_sample_rate_hz': float(sample_rate_hz),
+        'respiration_unit': 'adc_counts_relative',
+    }
 
 
 def parse_csv(text, sample_rate_hz):
@@ -63,11 +73,9 @@ def parse_csv(text, sample_rate_hz):
                                'lsb_mV': ADS_LSB_MV, 'input_column': 'ecg_raw'}}
         if status_frames:
             result['status_frames'] = status_frames
-        if respiration_raw:
-            center = float(np.median(respiration_raw))
-            result['respiration_waveform'] = [value - center for value in respiration_raw]
-            result['respiration_sample_rate_hz'] = float(sample_rate_hz)
-            result['respiration_unit'] = 'adc_counts_relative'
+        if (respiration_raw and len(respiration_raw) == len(values)
+                and all(map(math.isfinite, respiration_raw))):
+            result.update(respiration_channel(respiration_raw, sample_rate_hz))
         return result
     if 'ecg_filtered' in header:
         raise ValueError('ecg_filtered 单位未知，请提供 ecg_raw 或已转换的单列 mV')
@@ -165,8 +173,7 @@ def process(signal):
               'heart_rate_bpm': None,
               'processing_version': 'ads1292r-mv-v1',
               'filter_metadata': {'profile': 'offline-rhythm-view', 'bandpass_hz': [0.5, min(40, rate*.4)], 'order': 2, 'zero_phase': True, 'notch_hz': 50 if rate > 110 else None, 'notch_q': 30, 'model_waveform': 'unfiltered_mV'}}
-    for key in ('lead', 'source', 'conversion', 'status_frames', 'respiration_waveform',
-                'respiration_sample_rate_hz', 'respiration_unit'):
+    for key in ('lead', 'source', 'conversion', 'status_frames', *RESPIRATION_FIELDS):
         if key in signal:
             result[key] = signal[key]
     return result

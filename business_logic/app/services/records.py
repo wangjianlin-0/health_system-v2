@@ -20,6 +20,7 @@ from app.core.errors import (
 )
 from app.services import signals
 from app.services.storage import connect
+from signal_processing.python.ecg_preprocessing import RESPIRATION_FIELDS, parse_csv
 
 PROCESSING_VERSION = "records-v2"
 TERMINAL = {"completed", "failed", "cancelled"}
@@ -915,18 +916,31 @@ def reanalyze(user: str, identifier: str, *, model_type: str | None = None) -> d
         if model_type not in ('cnn', 'hgb', 'ensemble', 'openecg', 'none'):
             raise ValidationError('不支持的模型')
         signal['model_type'] = model_type
-    new_task = submit(user, signal, source_record_id=identifier)
     source_path = task["input_path"]
-    if source_path and Path(source_path).is_file():
-        target = (settings.upload_dir / user / f"{new_task['id']}.csv").resolve()
+    source_content = None
+    if source_path:
         try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(Path(source_path).read_bytes())
-            with connect() as db:
-                db.execute("UPDATE analysis_tasks SET input_path=? WHERE id=?", (str(target), new_task["id"]))
-        except OSError:
+            path = Path(source_path).resolve()
+            path.relative_to(settings.upload_dir.resolve())
+            source_content = path.read_bytes()
+        except (OSError, ValueError):
             pass
+    if (source_content is not None and signal.get('source') == 'ads1292r_bluetooth'
+            and not signal.get('respiration_waveform')):
+        _restore_capture_respiration(signal, source_content)
+    new_task = submit(user, signal, source_record_id=identifier)
+    if source_content is not None:
+        store_raw_input(user, new_task['id'], source_content)
     return new_task
+
+
+def _restore_capture_respiration(signal: dict, source_content: bytes) -> None:
+    try:
+        original = parse_csv(source_content.decode('utf-8-sig'), signal['sample_rate_hz'])
+    except (ValueError, KeyError):
+        return
+    if original.get('respiration_waveform') and original['samples'] == signal.get('samples'):
+        signal.update({field: original[field] for field in RESPIRATION_FIELDS})
 
 
 def export_record(user: str, identifier: str, format: str = "csv"):
@@ -943,10 +957,12 @@ def export_record(user: str, identifier: str, format: str = "csv"):
     result = record.get("result", {})
     prediction = result.get("prediction", {})
     heart_rate = prediction.get("heart_rate") or {}
+    respiration_rate = (result.get("respiration_analysis") or {}).get("rate_bpm")
     output = io.StringIO(newline="")
     writer = csv.DictWriter(output, fieldnames=[
         "timestamp_sec", "value", "sample_rate_hz", "unit", "source",
         "quality_status", "quality_reasons", "heart_rate_bpm", "record_id", "created_at",
+        "respiration_rate_bpm",
     ])
     writer.writeheader()
     values = result.get("waveform") or []
@@ -963,6 +979,7 @@ def export_record(user: str, identifier: str, format: str = "csv"):
             "heart_rate_bpm": heart_rate.get("bpm", result.get("heart_rate_bpm")),
             "record_id": record.get("id"),
             "created_at": record.get("created_at"),
+            "respiration_rate_bpm": respiration_rate,
         })
     return "\ufeff" + output.getvalue(), "text/csv; charset=utf-8"
 
