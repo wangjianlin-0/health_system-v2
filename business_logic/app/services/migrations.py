@@ -7,6 +7,25 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / 'db' / 'migrations'
+MAIN_FAMILY_CARE_V7 = {
+    '14a2c98a904ba24e229b92337f0504e6a1476a9202a641df2fdffc14fb8cb9a4',
+    'f0c35cbd2659e5a853b797ba1f0933569c13b5309b2fb80d1c60a7e19e4ac78c',
+}
+FAMILY_CARE_V9 = '596207546688b0a7d05e9edd9fb7a50c51315402b98fd6f379a175b9e5830aad'
+
+
+def _align_family_care_version(db, directory: Path) -> None:
+    """Map the original main migration to its identical schema at version 9."""
+    target = directory / '0009_family_care.py'
+    if not target.is_file():
+        return
+    row = db.execute('SELECT name, checksum FROM schema_migrations WHERE version = 7').fetchone()
+    if not row or row['name'] != 'family_care' or row['checksum'] not in MAIN_FAMILY_CARE_V7:
+        return
+    if hashlib.sha256(target.read_bytes()).hexdigest() != FAMILY_CARE_V9:
+        raise RuntimeError('迁移 0009_family_care.py 校验不一致')
+    db.execute('UPDATE schema_migrations SET version = 9, checksum = ? WHERE version = 7',
+               (FAMILY_CARE_V9,))
 
 
 def _load(path: Path):
@@ -26,6 +45,7 @@ def run_migrations(db, directory: Path | None = None) -> dict:
         name TEXT NOT NULL,
         checksum TEXT NOT NULL,
         applied_at TEXT NOT NULL)''')
+    _align_family_care_version(db, directory)
     applied = {row['version']: row for row in db.execute('SELECT version, checksum FROM schema_migrations')}
     current = max(applied, default=0)
     applied_now = []
@@ -35,9 +55,14 @@ def run_migrations(db, directory: Path | None = None) -> dict:
         name = str(getattr(module, 'NAME', path.stem))
         if version <= 0 or not callable(getattr(module, 'apply', None)):
             raise RuntimeError(f'迁移文件格式不正确：{path.name}')
-        checksum = hashlib.sha256(path.read_bytes()).hexdigest()
+        content = path.read_bytes()
+        checksum = hashlib.sha256(content).hexdigest()
         if version in applied:
-            if applied[version]['checksum'] != checksum:
+            # Older Windows checkouts could apply the same migration as CRLF.
+            lf = content.replace(b'\r\n', b'\n')
+            compatible_checksums = {checksum, hashlib.sha256(lf).hexdigest(),
+                                    hashlib.sha256(lf.replace(b'\n', b'\r\n')).hexdigest()}
+            if applied[version]['checksum'] not in compatible_checksums:
                 raise RuntimeError(f'迁移 {path.name} 校验不一致；已应用的迁移不允许修改')
             continue
         module.apply(db)

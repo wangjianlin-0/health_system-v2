@@ -11,13 +11,14 @@ def test_care_records_follow_accepted_grant_and_stop_on_revoke(client):
     assert client.get(path, headers=relative).status_code == 404
     assert respond(client, relative, grant_id).status_code == 200
 
-    for user in (owner, outsider):
-        task = client.post('/api/v1/acquisition/replay', headers=user, json={})
+    for user, title in ((owner, '共享心电'), (outsider, '其他人的记录')):
+        task = client.post('/api/v1/acquisition/replay', headers=user, json={'title': title})
         assert task.status_code == 202
         wait_task(client, user, task.json()['id'])
 
     care = client.get(path, headers=relative).json()
     assert care['record_count'] == 1
+    assert care['records'][0]['title'] == '共享心电'
     assert sum(day['count'] for day in care['week']) == 1
     record_id = care['records'][0]['id']
     wave_path = f'/api/v1/records/{record_id}/waveform?start_sec=0&end_sec=10'

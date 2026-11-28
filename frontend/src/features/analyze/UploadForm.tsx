@@ -3,8 +3,8 @@ import { DragEvent, FormEvent, useState } from 'react';
 const MAX_BYTES = 5_000_000;
 
 export default function UploadForm({onSubmit, onReplay, busy, progress, error}: {
-  onSubmit: (file: File, rate: number, model: string) => void;
-  onReplay: () => void;
+  onSubmit: (file: File, rate: number, model: string, title: string) => void;
+  onReplay: (title: string) => void;
   busy: boolean;
   progress: number;
   error: string;
@@ -12,6 +12,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
   const [file, setFile] = useState<File | null>(null);
   const [rate, setRate] = useState(500);
   const [model, setModel] = useState('cnn');
+  const [title, setTitle] = useState('');
   const [localError, setLocalError] = useState('');
   const [dragging, setDragging] = useState(false);
 
@@ -36,7 +37,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
       return;
     }
     setLocalError('');
-    onSubmit(file, rate, model);
+    onSubmit(file, rate, model, title.trim());
   }
 
   function drop(event: DragEvent<HTMLDivElement>) {
@@ -47,7 +48,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
 
   return <form className="upload-form" onSubmit={submit}>
     <details className="upload-format-note"><summary>支持格式与采样说明</summary>
-      <p>支持单列 mV CSV（value/sample/mv 表头），或包含 ecg_raw 的 ADS1292R 原始 CSV。ADS1292R 按 2.42 V、6 倍增益换算。默认采样率 500 Hz，其他设备请按实际采样率修改。</p>
+      <p>支持单列 mV CSV、ADS1292R 原始 CSV 和本项目导出的记录 CSV。有呼吸通道时会同时导入两路波形。默认采样率为 500 Hz，请按文件的实际采样率填写。</p>
     </details>
     <div className={`dropzone${dragging ? ' dragging' : ''}`}
          onDragOver={event => {event.preventDefault(); setDragging(true);}}
@@ -59,6 +60,10 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
         <span>{file ? `${(file.size / 1024).toFixed(1)} KB` : 'CSV · UTF-8 · 最大 5 MB'}</span>
       </label>
     </div>
+    <label className="record-title-input">记录名称（可选）
+      <input maxLength={80} value={title} onChange={event => setTitle(event.target.value)}
+        placeholder="留空则按日期和当天次数命名" />
+    </label>
     <div className="upload-settings">
     <label>采样率 <span>Hz</span>
       <input type="number" min={50} max={2000} value={rate} required
@@ -78,7 +83,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
     {(localError || error) && <p className="notice notice-error" role="alert">{localError || error}</p>}
     <div className="actions">
       <button disabled={busy}>{busy ? '提交中…' : '导入并分析'}</button>
-      <button type="button" className="secondary" disabled={busy} onClick={onReplay}>使用合成回放</button>
+      <button type="button" className="secondary" disabled={busy} onClick={() => onReplay(title.trim())}>使用合成回放</button>
     </div>
   </form>;
 }

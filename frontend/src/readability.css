@@ -1,0 +1,47 @@
+@media screen and (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  #root > main > nav a { font-size: 16px; }
+
+  #root > main > .records-page .records-heading h1 {
+    font-size: 28px;
+  }
+
+  #root > main > .records-page .records-total,
+  #root > main > .records-page .records-heading .eyebrow,
+  .records-page .records-heading > button,
+  .records-page .records-view-tabs button,
+  .records-page .records-filters :is(label, select, button),
+  .records-page .archive-tabs button {
+    font-size: 15px;
+  }
+
+  .records-page .records-filters { row-gap: 6px; }
+  .records-page .records-filters select { min-height: 36px; }
+  .records-page .records-filters input[type="checkbox"] { width: 16px; height: 16px; }
+  .records-page .archive-heading h2 { font-size: 18px; }
+
+  #root > main > .records-page .records-archive .record-title { font-size: 18px; }
+  #root > main > .records-page .records-archive .record-date { font-size: 16px; }
+
+  .records-page .records-archive :is(.record-metric, .record-model-tag, .record-actions, .record-actions button) {
+    font-size: 15px;
+  }
+
+  #root > main > .records-page .records-archive .record-row { min-height: 58px; }
+  .records-page .record-actions :is(a, button) { padding-block: 5px; }
+
+  .upload-form :is(.upload-format-note, .upload-format-note p, .upload-model-hint),
+  .upload-form .upload-settings :is(label, input, select),
+  .upload-form > .actions button {
+    font-size: 15px;
+  }
+
+  .analysis-detail-page .analysis-detail-head .detail-actions :is(button, select),
+  .analysis-detail-page .analysis-detail-tabs button,
+  .analysis-detail-page .analysis-wave-review .analysis-range-buttons button,
+  .analysis-detail-page .analysis-wave-review .analysis-window-caption {
+    font-size: 15px;
+  }
+
+  .analysis-detail-page .analysis-wave-review .analysis-window-caption { line-height: 1.5; }
+  .analysis-detail-page .analysis-event-table { font-size: 14px; }
+}

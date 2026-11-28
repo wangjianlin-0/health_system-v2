@@ -1,6 +1,6 @@
 """Persist collaboration data within a single accepted sharing relationship."""
 
-VERSION = 7
+VERSION = 9
 NAME = 'family_care'
 
 

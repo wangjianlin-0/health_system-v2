@@ -20,6 +20,7 @@ from app.core.errors import (
 )
 from app.services import signals
 from app.services.storage import connect
+from signal_processing.python.ecg_preprocessing import RESPIRATION_FIELDS, parse_csv
 
 PROCESSING_VERSION = "records-v2"
 TERMINAL = {"completed", "failed", "cancelled"}
@@ -170,7 +171,8 @@ def execute(task_id: str) -> bool:
             _finish_cancelled(task_id)
             return False
         return _save_result(task_id, row["owner_id"], result, row["source_record_id"],
-                            row["input_path"], row["input_sha256"]) is not None
+                            row["input_path"], row["input_sha256"],
+                            signal.get("record_title")) is not None
     except Exception as exc:
         _fail(task_id, exc)
         return False
@@ -238,8 +240,24 @@ def _record_columns():
     )
 
 
+def _root_record_row(db, identifier: str, owner: str):
+    """Follow reanalysis ancestry to the first measurement in this account."""
+    seen = set()
+    row = None
+    while identifier and identifier not in seen and len(seen) < 64:
+        seen.add(identifier)
+        next_row = db.execute("SELECT * FROM records WHERE id=? AND owner_id=?",
+                              (identifier, owner)).fetchone()
+        if not next_row:
+            break
+        row = next_row
+        identifier = row["supersedes_record_id"]
+    return row
+
+
 def _save_result(task_id: str, owner: str, result: dict, source_record_id: str | None,
-                 input_path: str | None = None, input_sha256: str | None = None):
+                 input_path: str | None = None, input_sha256: str | None = None,
+                 title: str | None = None):
     summary = _summary_from_result(result)
     record_id = secrets.token_hex(12)
     created_at = _now()
@@ -253,6 +271,26 @@ def _save_result(task_id: str, owner: str, result: dict, source_record_id: str |
         "result": stored_result,
     }
     with connect() as db:
+        if source_record_id:
+            original = _root_record_row(db, source_record_id, owner)
+            if original:
+                source_payload = json.loads(original["payload"])
+                if source_payload.get("body_context"):
+                    payload["body_context"] = source_payload["body_context"]
+                if original["note"]:
+                    payload["note"] = original["note"]
+                title = f"{(source_payload.get('title') or _default_record_title(original)).removesuffix('（重分析）')}（重分析）"
+        if title:
+            payload["title"] = title
+        else:
+            local = _parse_iso(created_at).astimezone()
+            start = datetime.combine(local.date(), datetime.min.time(), tzinfo=local.tzinfo).astimezone(timezone.utc)
+            end = start + timedelta(days=1)
+            count = db.execute(
+                "SELECT COUNT(*) FROM records WHERE owner_id=? AND created_at>=? AND created_at<?",
+                (owner, start.isoformat(), end.isoformat()),
+            ).fetchone()[0]
+            payload["title"] = f"{local:%Y年%m月%d日} 第{count + 1}次测量"
         current = db.execute("SELECT status, cancel_requested FROM analysis_tasks WHERE id=?", (task_id,)).fetchone()
         if not current or current["status"] != "running":
             return None
@@ -267,7 +305,7 @@ def _save_result(task_id: str, owner: str, result: dict, source_record_id: str |
                 summary["duration_sec"], summary["n_samples"], summary["quality_status"],
                 summary["quality_score"], summary["label"], summary["confidence"],
                 summary["heart_rate_bpm"], summary["model_version"], summary["processing_version"],
-                None, input_path, input_sha256, source_record_id, created_at,
+                payload.get("note"), input_path, input_sha256, source_record_id, created_at,
             ),
         )
         if waveform:
@@ -420,9 +458,10 @@ def create(user: str, signal: dict):
 
 
 def _record_summary(row, payload: dict | None = None) -> dict:
-    payload = payload or {}
+    payload = payload or json.loads(row["payload"] or "{}")
     return {
         "id": row["id"],
+        "title": re.sub(r"(?:（重分析）){2,}$", "（重分析）", payload.get("title") or _default_record_title(row)),
         "created_at": row["created_at"],
         "updated_at": row["updated_at"] or row["created_at"],
         "task_id": row["task_id"] or payload.get("task_id"),
@@ -443,6 +482,23 @@ def _record_summary(row, payload: dict | None = None) -> dict:
         "supersedes_record_id": row["supersedes_record_id"],
         "owner_username": row["owner_username"] if "owner_username" in row.keys() else None,
     }
+
+
+def _default_record_title(row) -> str:
+    created = _parse_iso(row["created_at"])
+    if not created:
+        return "心电测量"
+    local = created.astimezone()
+    start = datetime.combine(local.date(), datetime.min.time(), tzinfo=local.tzinfo).astimezone(timezone.utc)
+    end = start + timedelta(days=1)
+    with connect() as db:
+        number = db.execute(
+            "SELECT COUNT(*) FROM records WHERE owner_id=? AND created_at>=? AND created_at<? "
+            "AND (created_at<? OR (created_at=? AND id<=?))",
+            (row["owner_id"], start.isoformat(), end.isoformat(), row["created_at"],
+             row["created_at"], row["id"]),
+        ).fetchone()[0]
+    return f"{local:%Y年%m月%d日} 第{max(1, number)}次测量"
 
 
 def _query_parts(user: str, shared: bool, from_date=None, to_date=None, quality=None,
@@ -606,6 +662,19 @@ def personal_history_advice(user: str, timezone_name: str, *, polish: bool = Fal
     return {**build_advice(measurements), "report": polish_report(report) if polish else report,
             "qwen_available": bool(config())}
 
+
+def body_context_suggestions(user: str) -> dict:
+    choices = {}
+    with connect() as db:
+        for field in ("scene", "feeling"):
+            rows = db.execute(
+                f"""SELECT DISTINCT json_extract(payload, '$.body_context.{field}') AS value
+                    FROM records WHERE owner_id=? AND supersedes_record_id IS NULL
+                    AND json_type(payload, '$.body_context.{field}') = 'text'
+                    ORDER BY updated_at DESC LIMIT 30""", (user,)
+            ).fetchall()
+            choices[field] = list(dict.fromkeys(part.strip() for row in rows if row["value"] for part in row["value"].split("、") if part.strip()))
+    return choices
 
 def update_body_context(user: str, identifier: str, context: dict) -> dict:
     with connect() as db:
@@ -804,12 +873,27 @@ def update_note(user: str, identifier: str, note: str):
     row = _visible_record_row(user, identifier, owner_only=True)
     if not row:
         raise RecordNotFound("记录不存在或没有编辑权限")
+    if row["supersedes_record_id"]:
+        raise ValidationError("请在最初记录中修改备注")
     with connect() as db:
         db.execute(
             "UPDATE records SET note=?, updated_at=?, payload=json_set(payload, '$.note', ?) WHERE id=?",
             (text, _now(), text, identifier),
         )
         _audit(db, identifier, user, "note")
+    return detail(user, identifier)
+
+
+def update_title(user: str, identifier: str, title: str):
+    value = (title or "").strip()
+    if len(value) > 80:
+        raise ValidationError("记录名称最多 80 字符")
+    if not _visible_record_row(user, identifier, owner_only=True):
+        raise RecordNotFound("记录不存在或没有编辑权限")
+    with connect() as db:
+        db.execute("UPDATE records SET payload=json_set(payload, '$.title', ?), updated_at=? "
+                   "WHERE id=? AND owner_id=?", (value, _now(), identifier, user))
+        _audit(db, identifier, user, "note", "title")
     return detail(user, identifier)
 
 
@@ -832,18 +916,31 @@ def reanalyze(user: str, identifier: str, *, model_type: str | None = None) -> d
         if model_type not in ('cnn', 'hgb', 'ensemble', 'openecg', 'none'):
             raise ValidationError('不支持的模型')
         signal['model_type'] = model_type
-    new_task = submit(user, signal, source_record_id=identifier)
     source_path = task["input_path"]
-    if source_path and Path(source_path).is_file():
-        target = (settings.upload_dir / user / f"{new_task['id']}.csv").resolve()
+    source_content = None
+    if source_path:
         try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(Path(source_path).read_bytes())
-            with connect() as db:
-                db.execute("UPDATE analysis_tasks SET input_path=? WHERE id=?", (str(target), new_task["id"]))
-        except OSError:
+            path = Path(source_path).resolve()
+            path.relative_to(settings.upload_dir.resolve())
+            source_content = path.read_bytes()
+        except (OSError, ValueError):
             pass
+    if (source_content is not None and signal.get('source') == 'ads1292r_bluetooth'
+            and not signal.get('respiration_waveform')):
+        _restore_capture_respiration(signal, source_content)
+    new_task = submit(user, signal, source_record_id=identifier)
+    if source_content is not None:
+        store_raw_input(user, new_task['id'], source_content)
     return new_task
+
+
+def _restore_capture_respiration(signal: dict, source_content: bytes) -> None:
+    try:
+        original = parse_csv(source_content.decode('utf-8-sig'), signal['sample_rate_hz'])
+    except (ValueError, KeyError):
+        return
+    if original.get('respiration_waveform') and original['samples'] == signal.get('samples'):
+        signal.update({field: original[field] for field in RESPIRATION_FIELDS})
 
 
 def export_record(user: str, identifier: str, format: str = "csv"):
@@ -860,14 +957,19 @@ def export_record(user: str, identifier: str, format: str = "csv"):
     result = record.get("result", {})
     prediction = result.get("prediction", {})
     heart_rate = prediction.get("heart_rate") or {}
+    respiration_rate = (result.get("respiration_analysis") or {}).get("rate_bpm")
+    respiration = result.get("respiration_waveform") or []
     output = io.StringIO(newline="")
     writer = csv.DictWriter(output, fieldnames=[
         "timestamp_sec", "value", "sample_rate_hz", "unit", "source",
         "quality_status", "quality_reasons", "heart_rate_bpm", "record_id", "created_at",
+        "respiration_rate_bpm", "respiration_value", "respiration_unit",
     ])
     writer.writeheader()
     values = result.get("waveform") or []
     rate = float(result.get("sample_rate_hz") or 1)
+    paired_respiration = (len(respiration) == len(values)
+                          and float(result.get("respiration_sample_rate_hz") or 0) == rate)
     for index, value in enumerate(values):
         writer.writerow({
             "timestamp_sec": index / rate,
@@ -880,6 +982,9 @@ def export_record(user: str, identifier: str, format: str = "csv"):
             "heart_rate_bpm": heart_rate.get("bpm", result.get("heart_rate_bpm")),
             "record_id": record.get("id"),
             "created_at": record.get("created_at"),
+            "respiration_rate_bpm": respiration_rate,
+            "respiration_value": respiration[index] if paired_respiration else None,
+            "respiration_unit": result.get("respiration_unit") if paired_respiration else None,
         })
     return "\ufeff" + output.getvalue(), "text/csv; charset=utf-8"
 
@@ -924,11 +1029,34 @@ def detail(user: str, identifier: str):
             signal_row["data"], signal_row["encoding"], signal_row["n_samples"])
     elif "waveform" not in result:
         result["waveform"] = []
+    if (not result.get("respiration_waveform") and row["input_path"]
+            and result.get("source") in {"ads1292r_bluetooth", "ads1292r_csv"}):
+        try:
+            path = Path(row["input_path"]).resolve()
+            path.relative_to(settings.upload_dir.resolve())
+            signal = {"samples": result.get("waveform_raw_mV") or result["waveform"],
+                      "sample_rate_hz": result["sample_rate_hz"]}
+            _restore_capture_respiration(signal, path.read_bytes())
+            result.update({field: signal[field] for field in RESPIRATION_FIELDS if field in signal})
+        except (OSError, ValueError, KeyError):
+            pass
     for key, value in _record_summary(row, payload).items():
         if value is not None:
             payload[key] = value
         else:
             payload.setdefault(key, value)
+    if row["supersedes_record_id"]:
+        with connect() as db:
+            source_row = _root_record_row(db, row["supersedes_record_id"], row["owner_id"])
+        if source_row:
+            source_payload = json.loads(source_row["payload"])
+            payload["root_record_id"] = source_row["id"]
+            payload["root_record_title"] = source_payload.get("title") or _default_record_title(source_row)
+            payload["note"] = source_row["note"]
+            if source_payload.get("body_context"):
+                payload["body_context"] = source_payload["body_context"]
+            else:
+                payload.pop("body_context", None)
     payload["owner_username"] = row["owner_username"]
     payload["owned"] = row["owner_id"] == user
     if not payload["owned"]:

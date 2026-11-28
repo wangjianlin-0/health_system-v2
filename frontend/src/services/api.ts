@@ -54,6 +54,7 @@ export interface Prediction {
     next_steps?: string[];
     risk_level?: string;
     provider?: string;
+    model?: string;
   } | null;
 }
 export interface BeatEvent {
@@ -99,6 +100,9 @@ export interface EcgResult {
   source: string;
   waveform: number[];
   waveform_processed_mV?: number[];
+  respiration_waveform?: number[];
+  respiration_sample_rate_hz?: number;
+  respiration_unit?: string;
   sample_rate_hz: number;
   unit: string;
   duration_sec: number;
@@ -129,6 +133,7 @@ export interface WaveformWindow {
 }
 export interface RecordSummary {
   id: string;
+  title: string;
   created_at: string;
   updated_at: string;
   task_id: string | null;
@@ -147,6 +152,9 @@ export interface RecordSummary {
   processing_version: string | null;
   note: string | null;
   supersedes_record_id: string | null;
+  supersedes_record_title?: string | null;
+  root_record_id?: string | null;
+  root_record_title?: string | null;
   owner_username?: string | null;
 }
 export interface RecordDetail extends RecordSummary {
@@ -326,4 +334,9 @@ export function outcomeLabel(outcome: string | null): string {
   if (outcome === 'model_unavailable') return '未接入模型';
   if (outcome === 'unknown') return '结果未知';
   return outcome || '—';
+}
+
+export function recordSourceLabel(source: string | null): string {
+  const labels: Record<string, string> = {csv_export: 'CSV 导入', csv_upload: 'CSV 导入', synthetic_replay: '示例回放', live_capture: '实时测量'};
+  return source ? labels[source] ?? '心电测量' : '心电测量';
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AnalysisTask, Notification, RecordPage, RecordTrends, TaskPage, localTimezone, request,
+  AnalysisTask, Notification, RecordPage, RecordTrends, TaskPage, localTimezone, recordSourceLabel, request,
 } from '../services/api';
 import { TaskStatusBadge } from '../components/badges';
 
@@ -38,62 +38,56 @@ export default function Dashboard() {
   }, []);
 
   const stats = summary?.summary;
-
-  return <section className="dashboard-page">
-    {notifications.length > 0 && <Link className="dashboard-notice" to="/family">
-      <span className="dashboard-notice-label">家庭协同</span><span>{notifications[0].message}</span>
-      <span className="dashboard-notice-date">站内通知</span><strong>查看通知 →</strong>
-    </Link>}
-    <div className="dashboard-hero">
-      <div className="dashboard-hero-copy">
-        <p className="eyebrow">个人与家庭心电记录</p>
-        <h1>把每一次测量，整理成可回顾的健康记录</h1>
-        <p>本地采集或导入心电数据，查看波形、分析结果与长期趋势。</p>
+  return <section className="dashboard-page portal-dashboard">
+    <div className="portal-top">
+      <div className="portal-welcome">
+        <p className="eyebrow">个人健康档案</p>
+        <h1>欢迎回来</h1>
+        <p>从一次测量开始，集中查看心电记录与家庭共享。</p>
+        <div className="portal-primary-actions">
+          <Link className="button" to="/monitor">开始测量</Link>
+          <Link className="button secondary" to="/analyze">导入心电文件</Link>
+        </div>
+        <p className="portal-device">采集状态：{device}</p>
       </div>
-      <div className="dashboard-hero-actions">
-        <Link className="button dashboard-primary" to="/monitor">开始测量 <span>→</span></Link>
-        <Link className="button secondary" to="/family">家庭协同</Link>
-        <Link className="button secondary" to="/records">历史趋势</Link>
+      <div className="portal-summary">
+        <h2>近 30 天概览</h2>
+        <div className="portal-stat-grid">
+          <div><strong>{stats?.total ?? 0}</strong><span>次测量</span></div>
+          <div><strong>{stats?.heart_rate_days ?? 0}</strong><span>天有心率数据</span></div>
+          <div><strong>{stats?.avg_heart_rate_bpm ?? '—'}</strong><span>平均心率 · 次/分</span></div>
+          <div><strong>{stats?.insufficient ?? 0}</strong><span>次质量不足</span></div>
+        </div>
+        <Link to="/records">查看完整历史与趋势 →</Link>
       </div>
-      <div className="dashboard-device"><span className="dashboard-live-dot" />{device}</div>
     </div>
     {error && <p className="notice notice-error" role="alert">{error}</p>}
-
-    <div className="dashboard-flow"><span>记录流程</span><strong>开始测量</strong><i>→</i><strong>查看波形</strong><i>→</i><strong>阅读分析</strong><i>→</i><strong>保存并回顾</strong></div>
-
-    {active.length > 0 && <div className="active-tasks">
-      <h2>进行中的任务</h2>
-      {active.map(task => <Link className="active-task" key={task.id} to={`/analyze?task=${task.id}`}>
-        <TaskStatusBadge status={task.status} />
-        <span className="mono">{task.id}</span>
-        <span>{task.stage ?? 'queued'}</span>
-      </Link>)}
-    </div>}
-
-    <div className="dashboard-feature-grid">
-      <article className="dashboard-feature feature-teal"><div><span>01</span><b>开始测量</b><small>实时采集或连接设备</small></div><Link to="/monitor">进入测量 →</Link></article>
-      <article className="dashboard-feature feature-blue"><div><span>02</span><b>导入与分析</b><small>上传心电文件或回放示例</small></div><Link to="/analyze">进入分析 →</Link></article>
-      <article className="dashboard-feature feature-green"><div><span>03</span><b>查看分析结果</b><small>波形、心率与质量信息</small></div><Link to="/analyze">查看结果 →</Link></article>
-      <article className="dashboard-feature feature-violet"><div><span>04</span><b>历史趋势</b><small>按日期查看记录与变化</small></div><Link to="/records">浏览档案 →</Link></article>
+    <div className="portal-columns">
+      <article className="portal-panel portal-recent">
+        <div className="portal-panel-head"><div><p className="eyebrow">测量时间线</p><h2>最近记录</h2></div>
+          <Link to="/records">查看全部 →</Link></div>
+        {recent.length === 0 && <div className="portal-empty">还没有测量记录。可以导入 CSV 或尝试合成回放。</div>}
+        {recent.map(record => <Link className="portal-record" key={record.id} to={'/records/' + record.id}>
+          <div><strong>{record.title}</strong><span>{new Date(record.created_at).toLocaleString()} · {recordSourceLabel(record.source)}</span></div>
+          <span>{record.heart_rate_bpm == null ? '暂无心率' : record.heart_rate_bpm + ' 次/分'}</span>
+        </Link>)}
+      </article>
+      <div className="portal-side">
+        <article className="portal-panel">
+          <p className="eyebrow">家庭共享</p><h2>与家人一起回顾</h2>
+          <p>邀请已注册的家属。对方确认后可查看共享记录，你可以随时撤回。</p>
+          {notifications.length > 0 && <p className="portal-notice">{notifications[0].message}</p>}
+          <Link to="/family">管理邀请与授权 →</Link>
+        </article>
+        <article className="portal-panel">
+          <p className="eyebrow">进行中的分析</p><h2>{active.length} 个任务</h2>
+          {active.length === 0 ? <p>当前没有正在处理的任务。</p> :
+            active.map(task => <Link key={task.id} className="portal-task" to={'/analyze?task=' + task.id}>
+              <TaskStatusBadge status={task.status} />查看任务进度 →</Link>)}
+          <Link to="/guide">第一次使用？查看操作手册 →</Link>
+        </article>
+      </div>
     </div>
-
-    <div className="dashboard-summary-grid">
-      <div><strong>{stats?.total ?? 0}</strong><span>近 30 天记录</span></div>
-      <div><strong>{stats?.insufficient ?? 0}</strong><span>质量不足</span></div>
-      <div><strong>{stats?.heart_rate_days ?? 0}</strong><span>有心率的日期</span></div>
-      <div><strong>{stats?.avg_heart_rate_bpm ?? '—'}</strong><span>平均心率（次/分）</span></div>
-    </div>
-
-    <article className="recent-records">
-      <h2>最近记录</h2>
-      {recent.length === 0 && <p className="hint">还没有记录，导入或回放一条开始。</p>}
-      {recent.map(record => <Link className="recent-row" key={record.id} to={'/records/' + record.id}>
-        <span>{new Date(record.created_at).toLocaleString()}</span>
-        <span className="badge badge-muted">{record.source ?? '未知来源'}</span>
-        <span>{record.heart_rate_bpm == null ? '—' : `${record.heart_rate_bpm} 次/分`}</span>
-      </Link>)}
-      {recent.length > 0 && <Link className="link" to="/records">查看全部 →</Link>}
-    </article>
-
+    <p className="portal-safety">记录与分析结果用于辅助回顾，不能单独用于医疗诊断。</p>
   </section>;
 }

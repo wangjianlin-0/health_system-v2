@@ -1,4 +1,5 @@
 """ADS1292R蓝牙串口会话：只接收、保留原始数据、错误后不跨段续接。"""
+from array import array
 from collections import deque
 from pathlib import Path
 import csv
@@ -11,9 +12,10 @@ import uuid
 import numpy as np
 from scipy.signal import butter, sosfilt, sosfilt_zi
 
+from ai_model.inference.factory import load_classifier, predict
 from hardware.vendor.ads1292 import decode_vendor_frame, VENDOR_FORMATS
 from hardware.vendor.windows_serial import WindowsSerial
-from signal_processing.python.ecg_preprocessing import ADS_LSB_MV
+from signal_processing.python.ecg_preprocessing import ADS_LSB_MV, respiration_channel
 
 
 def ports():
@@ -84,6 +86,7 @@ class Session:
         self.changed = threading.Event()
         self.done = threading.Event()
         self.values = []
+        self.respiration_codes = array('i')
         self.display = deque(maxlen=2500)
         self.status, self.error = 'starting', None
         self.prediction, self.analysis_samples = None, 0
@@ -143,7 +146,8 @@ class Session:
                         index = len(self.values)
                         self.writer.writerow([index / 500, resp + 8388608, ecg + 8388608])
                         self.values.append(value)
-                        self.display.append(dict(t=index / 500, v=float(view), raw=value))
+                        self.respiration_codes.append(resp)
+                        self.display.append(dict(t=index / 500, v=float(view), raw=value, respiration=resp))
                     self.csv_file.flush()
                 self.changed.set()
         except Exception as exc:
@@ -162,8 +166,7 @@ class Session:
             self._metadata()
 
     def _analyze(self):
-        from ai_model.inference.edge_adapter import EdgeClassifier
-        classifier = EdgeClassifier(self.model)
+        classifier = load_classifier(self.model)
         previous, last_run = 0, 0.
         while True:
             self.changed.wait(.5)
@@ -179,7 +182,10 @@ class Session:
                     continue
                 values = list(self.values)
             previous, last_run = count, time.monotonic()
-            prediction = classifier.predict(dict(waveform_raw_mV=values, sample_rate_hz=500, unit='mV'))
+            prediction = predict(classifier, dict(waveform_raw_mV=values, sample_rate_hz=500, unit='mV'))
+            # The live display uses primary beat counts. Full model review is available on saved records.
+            prediction.pop('agreement', None)
+            prediction.pop('review_model', None)
             # 每次重算从会话起点到当前的全部前缀；不把独立分块当连续推理。
             # 在线仅显示至少滞后2.5秒的稳定事件，末尾未完成心拍留到停止后整段复算。
             if not final and prediction.get('beats'):
@@ -237,6 +243,7 @@ class Session:
             raise ValueError('本次没有收到完整样本')
         return dict(samples=list(self.values), sample_rate_hz=500, unit='mV',
             lead='ads1292r_ch2', source='ads1292r_bluetooth', model_type=self.model,
+            **respiration_channel(self.respiration_codes, 500),
             acquisition=dict(session_id=self.id, format=self.format, port=self.port, baud=self.baud,
                 source_dropped_samples=None, continuity_verified=False, error=self.error,
                 pending_bytes=len(self.parser.buffer), skipped_initial_bytes=self.parser.skipped,

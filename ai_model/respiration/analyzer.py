@@ -64,7 +64,7 @@ class RespirationAnalyzer:
                 numeric = float(value)
             except (TypeError, ValueError):
                 continue
-            if math.isfinite(numeric):
+            if math.isfinite(numeric) and numeric > 0:
                 rate_values.append(numeric)
         rate_bpm = round(statistics.median(rate_values), 1) if rate_values else local.get('rate_bpm')
         intervals = [(right - left) / target_rate for left, right in zip(peaks, peaks[1:])]
@@ -73,8 +73,9 @@ class RespirationAnalyzer:
             interval_cv = round(statistics.pstdev(intervals) / statistics.mean(intervals), 3)
         pause_candidates = self._pause_candidates(peaks, target_rate)
         status = local.get('status', 'good')
-        if len(peaks) < 2:
+        if len(peaks) < 2 or rate_bpm is None:
             status = 'insufficient'
+            rate_bpm = None
         return {
             'available': True,
             'status': status,

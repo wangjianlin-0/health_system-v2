@@ -22,15 +22,20 @@ export function decimate(values: number[], buckets: number): number[] {
   return output;
 }
 
-export default function Waveform({values = [], points, duration, unit, offset = 0, markers = []}: {
+export default function Waveform({values = [], points, duration, unit, offset = 0, markers = [],
+  channel = 'ecg', sampleRate, sampleOffset = offset}: {
   values?: number[];
   points?: WaveformPoint[];
   duration: number;
   unit: string;
   offset?: number;
+  channel?: 'ecg' | 'respiration';
+  sampleRate?: number;
+  sampleOffset?: number;
   markers?: {time_sec: number; label: string; kind?: 'normal' | 'attention'}[];
 }) {
   const gridId = useId();
+  const title = channel === 'respiration' ? '呼吸波形' : '心电波形';
   const fromWindow = Boolean(points && points.length);
   if (!fromWindow && !values.length) return <p className="empty-state">没有波形数据。</p>;
 
@@ -45,7 +50,8 @@ export default function Waveform({values = [], points, duration, unit, offset = 
         if (values[index] > values[maxIndex]) maxIndex = index;
       }
       for (const index of [...new Set([minIndex, maxIndex])].sort((a, b) => a - b)) {
-        source.push({t: offset + index / Math.max(values.length - 1, 1) * duration, v: values[index]});
+        const t = sampleRate ? sampleOffset + index / sampleRate : offset + index / Math.max(values.length - 1, 1) * duration;
+        source.push({t, v: values[index]});
       }
     }
   }
@@ -74,9 +80,9 @@ export default function Waveform({values = [], points, duration, unit, offset = 
   const startLabel = offset === 0 ? '0 s' : `${offset.toFixed(2)} s`;
   const endLabel = `${(offset + duration).toFixed(2)} s`;
 
-  return <figure>
+  return <figure className={channel === 'respiration' ? 'respiration-trace' : undefined}>
     <svg viewBox="0 0 1000 240" role="img"
-         aria-label={`心电波形，${offset.toFixed(2)} 到 ${(offset + duration).toFixed(2)} 秒，${source.length} 个绘制点`}>
+         aria-label={`${title}，${offset.toFixed(2)} 到 ${(offset + duration).toFixed(2)} 秒，${source.length} 个绘制点`}>
       <defs>
         <pattern id={gridId} width="50" height="40" patternUnits="userSpaceOnUse">
           <path d="M 50 0 L 0 0 0 40" fill="none" stroke="#dce8e3" />
@@ -98,14 +104,16 @@ export default function Waveform({values = [], points, duration, unit, offset = 
         </g>;
       })}
       <polyline points={coordinates} fill="none" stroke="#157a70" strokeWidth="1.3" />
-      <text x={left - 6} y={top + 4} textAnchor="end" className="wave-label">{max.toFixed(3)}</text>
-      <text x={left - 6} y={bottom} textAnchor="end" className="wave-label">{min.toFixed(3)}</text>
+      <text x={channel === 'respiration' ? left + 5 : left - 6} y={channel === 'respiration' ? top - 6 : top + 4}
+        textAnchor={channel === 'respiration' ? 'start' : 'end'} className="wave-label">{max.toFixed(3)}</text>
+      <text x={channel === 'respiration' ? left + 5 : left - 6} y={channel === 'respiration' ? bottom + 13 : bottom}
+        textAnchor={channel === 'respiration' ? 'start' : 'end'} className="wave-label">{min.toFixed(3)}</text>
       <text x={left} y={224} textAnchor="start" className="wave-label">{startLabel}</text>
       <text x={right} y={224} textAnchor="end" className="wave-label">{endLabel}</text>
     </svg>
     <figcaption>
       窗口 {startLabel}–{endLabel} · 幅值 {min.toFixed(3)}–{max.toFixed(3)} {unit}
-      {fromWindow ? ' · 服务端按窗口返回包络极值' : ' · 按像素桶保留极值，避免漏掉尖峰'}
+      {!fromWindow && ' · 按像素桶保留极值，避免漏掉尖峰'}
     </figcaption>
   </figure>;
 }

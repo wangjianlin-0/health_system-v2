@@ -1,5 +1,4 @@
 import json
-import shutil
 import time
 
 import pytest
@@ -38,8 +37,8 @@ def legacy_payload():
 def test_fresh_database_is_migrated_and_idempotent(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, 'DB', tmp_path / 'fresh.sqlite3')
     first = storage.initialize()
-    assert first['current'] >= 7
-    assert first['applied'] == [1, 2, 3, 4, 5, 6, 7]
+    assert first['current'] == 9
+    assert first['applied'] == list(range(1, 10))
     second = storage.initialize()
     assert second['applied'] == []
     assert second['current'] == first['current']
@@ -89,11 +88,15 @@ def test_legacy_database_backfills_summary_columns(tmp_path, monkeypatch):
         [0.1, 0.2, 0.3], rel=1e-6)
 
 
-def test_family_care_upgrade_preserves_existing_family_access(tmp_path, monkeypatch):
+@pytest.mark.parametrize('newline', [b'\n', b'\r\n'])
+def test_family_care_upgrade_preserves_existing_family_access(tmp_path, monkeypatch, newline):
     previous_migrations = tmp_path / 'previous_migrations'
     previous_migrations.mkdir()
     for path in migrations.MIGRATIONS_DIR.glob('000[1-6]_*.py'):
-        shutil.copy2(path, previous_migrations / path.name)
+        (previous_migrations / path.name).write_bytes(path.read_bytes().replace(b'\n', newline))
+    original_care = (migrations.MIGRATIONS_DIR / '0009_family_care.py').read_bytes().replace(
+        b'VERSION = 9', b'VERSION = 7').replace(b'\n', newline)
+    (previous_migrations / '0007_family_care.py').write_bytes(original_care)
 
     monkeypatch.setattr(storage, 'DB', tmp_path / 'existing-family.sqlite3')
     with storage.connect() as db:
@@ -105,10 +108,15 @@ def test_family_care_upgrade_preserves_existing_family_access(tmp_path, monkeypa
             "VALUES ('shared-grant','owner','relative',1,'accepted',?,NULL)",
             (time.time(),),
         )
+        db.execute("INSERT INTO family_care_items(id, grant_id, title, due_date, due_time) "
+                   "VALUES ('item', 'shared-grant', 'follow-up', '2026-11-28', '08:00')")
 
-    assert storage.initialize()['applied'] == [7]
+    assert storage.initialize() == {'current': 9, 'applied': [7, 8]}
+    assert storage.initialize() == {'current': 9, 'applied': []}
     with storage.connect() as db:
         grant = db.execute("SELECT active,status FROM grants WHERE id='shared-grant'").fetchone()
+        assert db.execute("SELECT title FROM family_care_items WHERE id='item'").fetchone()[0] == 'follow-up'
+        assert {'age', 'sex'} <= {row['name'] for row in db.execute('PRAGMA table_info(users)')}
         care_tables = {row['name'] for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'family_care_%'"
         )}

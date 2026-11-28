@@ -1,19 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
-import BodyContextForm from './BodyContextForm';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import BodyContextForm, {formatBodyContext} from './BodyContextForm';
 import EcgImageExport from './EcgImageExport';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AnalysisTask, BeatEvent, RecordDetail as RecordDetailType,
-  downloadFile, post, request,
+  downloadFile, post, recordSourceLabel, request,
 } from '../../services/api';
 import Waveform from '../../components/Waveform';
 import { OutcomeBadge, OwnerTag, QualityBadge } from '../../components/badges';
+import './recordReview.css';
 
-const waveformRanges = [
-  {length: 10, label: '10s'},
-  {length: 30, label: '30s'},
-  {length: 'all', label: '全程'},
-] as const;
+const beatCodes: Record<string, string> = {
+  normal: 'N', pac: 'S', pvc: 'V', fusion: 'F', unknown: '未分类',
+  unclassified: '未分类', paced: '起搏',
+};
+
+export function modelDisplay(version?: string | null, requested?: string | null): string {
+  const value = (version || requested || '').toLowerCase();
+  if (requested === 'ensemble' || value.includes('ensemble') || value.includes('primary+hgb')) return 'CNN + HGB 复核';
+  if (value.includes('openecg')) return 'OpenECG';
+  if (value.includes('hgb')) return 'HGB v92';
+  if (value.includes('cnn')) return 'CNN H27';
+  if (value === 'none' || value.includes('signal')) return '仅信号检查';
+  return '未获得模型结果';
+}
+
+function eventTime(event: BeatEvent, sampleRate: number) {
+  return event.time_sec ?? (event.sample != null && sampleRate > 0 ? event.sample / sampleRate : null);
+}
 
 function dash(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -76,6 +90,11 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const regularityText = regularity === 'regular' ? '相对规则' :
     regularity === 'irregular' ? '不规则' : '无法判断';
   const respirationAnalysis = result.respiration_analysis;
+  const respirationSummary = respirationAnalysis?.provider === 'none'
+    ? '本次分析缺少呼吸波形'
+    : respirationAnalysis?.cycle_count == null
+      ? '未生成呼吸周期结果'
+      : `${respirationAnalysis.cycle_count} 个周期 · 长间隔 ${respirationAnalysis.pause_candidates.length}`;
   const safety = result.safety;
   const qualityReasonLabels: Record<string, string> = {
     record_too_short: '记录时长过短',
@@ -108,14 +127,35 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const duration = result.duration_sec ?? 0;
   const [windowLength, setWindowLength] = useState<10 | 30 | 'all'>(10);
   const [windowStart, setWindowStart] = useState(0);
-  const [selectedAbnormal, setSelectedAbnormal] = useState<number | null>(null);
   const [detailTab, setDetailTab] = useState<'overview' | 'models' | 'notes'>('overview');
+  const [filtered, setFiltered] = useState(false);
+  const [selectedAbnormal, setSelectedAbnormal] = useState<number | null>(null);
+  const [beatLimit, setBeatLimit] = useState(30);
+  const [title, setTitle] = useState(record.title);
+  const [savedTitle, setSavedTitle] = useState(record.title);
+  const [titleMessage, setTitleMessage] = useState('');
+  const [titleSaving, setTitleSaving] = useState(false);
+  const waveHeading = useRef<HTMLHeadingElement>(null);
+  const scrollToWave = useRef(false);
 
   useEffect(() => {
     setWindowStart(0);
     setWindowLength(10);
+    setFiltered(false);
     setSelectedAbnormal(null);
-  }, [record.id]);
+    setDetailTab('overview');
+    setBeatLimit(30);
+    setTitle(record.title);
+    setSavedTitle(record.title);
+    setTitleMessage('');
+  }, [record.id, record.title]);
+
+  useEffect(() => {
+    if (detailTab === 'overview' && scrollToWave.current) {
+      scrollToWave.current = false;
+      waveHeading.current?.focus();
+    }
+  }, [detailTab]);
 
   useEffect(() => {
     setNote(record.note ?? '');
@@ -178,64 +218,93 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     }
   }
 
+  async function saveTitle() {
+    setTitleSaving(true);
+    setTitleMessage('');
+    try {
+      const next = await request<RecordDetailType>(`/records/${record.id}/title`, {
+        method: 'PATCH', body: JSON.stringify({title}),
+      });
+      setTitle(next.title);
+      setSavedTitle(next.title);
+      setTitleMessage('记录名称已保存');
+    } catch (caught) {
+      setTitleMessage((caught as Error).message);
+    } finally {setTitleSaving(false);}
+  }
+
   const bpm = prediction.heart_rate?.bpm ?? record.heart_rate_bpm ?? null;
   const beatCounts = beatAnalysis?.counts ?? prediction.beats?.by_type ?? {};
-  const beatModelVersion = beatAnalysis?.model_version ?? prediction.model_version ?? record.model_version ?? '';
-  const usesMergedVfClass = /^hgb/i.test(beatModelVersion);
-  const ventricularCode = usesMergedVfClass ? 'VF' : 'V';
   const normalBeats = beatCounts.normal ?? beatCounts.N ?? 0;
   const atrialBeats = beatCounts.pac ?? beatCounts.S ?? 0;
-  const ventricularBeats = beatCounts.pvc ?? beatCounts.vpc ?? beatCounts[ventricularCode] ?? prediction.beats?.vpc_count ?? 0;
+  const ventricularBeats = prediction.beats?.vpc_count ?? beatCounts.pvc ?? beatCounts.V ?? 0;
   const fusionBeats = beatCounts.fusion ?? beatCounts.F ?? 0;
-  const beatTotal = beatAnalysis?.total ?? prediction.beats?.count ?? 0;
-  const beatClasses = [
-    {code: 'N', count: normalBeats},
-    {code: 'S', count: atrialBeats},
-    {code: ventricularCode, count: ventricularBeats},
-  ];
-  if (!usesMergedVfClass) beatClasses.push({code: 'F', count: fusionBeats});
+  const isHgb = /^hgb/i.test(beatAnalysis?.model_version ?? record.model_version ?? '');
+  const unknownBeats = beatCounts.unknown ?? prediction.beats?.unclassified_count ?? 0;
   const displayLength = windowLength === 'all' ? duration : Math.min(duration, windowLength);
   const maxWindowStart = Math.max(0, duration - displayLength);
   const windowEnd = Math.min(duration, windowStart + displayLength);
   const sampleStart = Math.max(0, Math.floor(windowStart * result.sample_rate_hz));
   const sampleEnd = Math.min(result.waveform?.length ?? 0, Math.ceil(windowEnd * result.sample_rate_hz));
-  const displayedWaveform = (result.waveform ?? []).slice(sampleStart, sampleEnd);
+  const displayedWaveform = (filtered ? result.waveform_processed_mV ?? [] : result.waveform ?? []).slice(sampleStart, sampleEnd);
+  const traceOffset = sampleStart / result.sample_rate_hz;
+  const traceDuration = Math.max(0, (displayedWaveform.length - 1) / result.sample_rate_hz);
+  const respirationRate = result.respiration_sample_rate_hz || result.sample_rate_hz;
+  const respirationStart = Math.ceil(sampleStart * respirationRate / result.sample_rate_hz);
+  const respirationEnd = 1 + Math.floor((sampleEnd - 1) * respirationRate / result.sample_rate_hz);
+  const displayedRespiration = result.respiration_waveform?.slice(respirationStart, respirationEnd) ?? [];
   const sourceEvents: BeatEvent[] = beatAnalysis?.events ?? (prediction.beats?.items ?? []).map(item => ({
-    time_sec: item.r_seconds, sample: item.r_sample500, label: item.label,
+    time_sec: item.r_seconds, sample: item.r_sample500, label: item.valid ? item.label : 'unknown',
+    confidence: item.confidence, raw_label: item.label,
   }));
-  const beatMarkers = sourceEvents.flatMap(event => {
-    const time = event.time_sec ?? (event.sample != null ? event.sample / result.sample_rate_hz : null);
-    if (time == null || !Number.isFinite(time)) return [];
-    const label = event.label.toUpperCase();
-    const normal = label === 'N' || label.includes('NORMAL');
-    return [{time_sec: time, label: normal ? 'N' : event.label, kind: normal ? 'normal' as const : 'attention' as const}];
-  });
-  const orderedBeatMarkers = [...beatMarkers].sort((first, second) => first.time_sec - second.time_sec);
+  const classified = beatAnalysis ? beatAnalysis.status === 'classified' : prediction.status === 'classified';
+  const orderedBeatMarkers = sourceEvents.flatMap(event => {
+    const time = eventTime(event, result.sample_rate_hz);
+    if (time == null || !Number.isFinite(time) || time < 0 || time > duration) return [];
+    const label = (isHgb && event.label === 'pvc') ? 'VF' : (beatCodes[event.label.toLowerCase()] ?? event.label);
+    const attention = classified && label !== 'N';
+    return [{time_sec: time, label, confidence: event.confidence,
+      kind: attention ? 'attention' as const : 'normal' as const}];
+  }).sort((first, second) => first.time_sec - second.time_sec);
   const abnormalRows = orderedBeatMarkers.flatMap((event, index) => {
     if (event.kind !== 'attention') return [];
     const previous = orderedBeatMarkers[index - 1];
-    const rrMs = previous ? Math.round((event.time_sec - previous.time_sec) * 1000) : null;
-    const aamiLabel = event.label === 'V' ? 'V · 室性早搏' : event.label === 'S' ? 'S · 室上性早搏' : event.label;
-    return [{...event, number: index + 1, rrMs, bpm: rrMs && rrMs > 0 ? Math.round(60_000 / rrMs) : null, aamiLabel}];
+    const seconds = previous ? event.time_sec - previous.time_sec : 0;
+    const rrMs = seconds > 0 ? Math.round(seconds * 1000) : null;
+    return [{...event, number: index + 1, rrMs, bpm: seconds > 0 ? Math.round(60 / seconds) : null}];
   });
+  const beatMarkers = classified ? orderedBeatMarkers : [];
   function locateAbnormal(index: number) {
+    if (!abnormalRows[index]) return;
     setSelectedAbnormal(index);
     setWindowLength(10);
     setWindowStart(Math.max(0, Math.min(duration - 10, abnormalRows[index].time_sec - 5)));
-    setDetailTab('overview');
+    if (detailTab !== 'overview') {
+      scrollToWave.current = true;
+      setDetailTab('overview');
+    }
   }
-
-  function jumpToAbnormal(direction: -1 | 1) {
-    const current = selectedAbnormal ?? (direction === 1 ? -1 : 0);
-    locateAbnormal((current + direction + abnormalRows.length) % abnormalRows.length);
+  function jumpToAbnormal(direction: 1 | -1) {
+    const total = abnormalRows.length;
+    const index = selectedAbnormal == null ? (direction === 1 ? 0 : total - 1)
+      : (selectedAbnormal + direction + total) % total;
+    locateAbnormal(index);
   }
-  const miniStep = Math.max(1, Math.ceil((result.waveform?.length ?? 0) / 900));
-  const miniWaveform = (result.waveform ?? []).filter((_, index) => index % miniStep === 0)
-    .map((value, index, values) => `${(index / Math.max(values.length - 1, 1) * 1000).toFixed(1)},${(28 - value * 12).toFixed(1)}`).join(' ');
+  const miniWaveform = useMemo(() => {
+    const samples = result.waveform ?? [];
+    const step = Math.max(1, Math.ceil(samples.length / 900));
+    const summary = samples.filter((_, index) => index % step === 0);
+    const min = Math.min(...summary);
+    const range = Math.max(...summary) - min || 1;
+    return summary.map((value, index) => {
+      const x = index * step / Math.max(samples.length - 1, 1) * 1000;
+      return `${x.toFixed(1)},${(49 - (value - min) / range * 42).toFixed(1)}`;
+    }).join(' ');
+  }, [result.waveform]);
   const metadata: [string, string][] = [
     ['记录 ID', record.id],
     ['任务 ID', dash(record.task_id)],
-    ['来源', dash(record.source)],
+    ['来源', recordSourceLabel(record.source)],
     ['导联', dash(record.lead)],
     ['单位', dash(record.unit)],
     ['采样率', record.sample_rate_hz == null ? '—' : `${record.sample_rate_hz} Hz`],
@@ -252,7 +321,8 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     <header className="detail-head analysis-detail-head">
       <div>
         <p className="eyebrow">记录详情</p>
-        <h1>{timeText(record.created_at)}</h1>
+        <h1>{savedTitle || timeText(record.created_at)}</h1>
+        <p className="hint review-record-source">{timeText(record.created_at)} · {modelDisplay(record.model_version, prediction.beat_model?.requested)}</p>
         <p className="detail-sub">
           <QualityBadge status={record.quality_status ?? quality.status} score={record.quality_score ?? quality.score} />
           <OutcomeBadge outcome={prediction.status} />
@@ -285,37 +355,34 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     {actionError && <p className="notice notice-error" role="alert">{actionError}</p>}
     {!owned && <p className="notice">这条记录由 {record.owner_username ?? '其他用户'} 共享，仅可查看。</p>}
     {record.supersedes_record_id &&
-      <p className="hint">由记录 <Link to={'/records/' + record.supersedes_record_id}>
-        {record.supersedes_record_id}</Link> 重新分析得到。</p>}
-
-    {owned && !record.supersedes_record_id && <BodyContextForm key={record.id} id={record.id}
-      context={record.body_context} />}
+      <p className="hint">由 <Link to={'/records/' + (record.root_record_id ?? record.supersedes_record_id)}>
+        {record.root_record_title ?? '原测量记录'}</Link> 重新分析得到。</p>}
+    {safety && safety.level !== 'reference_only' && <p className={`notice ${safety.urgent ? 'notice-error' : ''}`}
+      role={safety.urgent ? 'alert' : undefined}>{safety.message}</p>}
 
     <div className="analysis-result-cards">
       <div className="analysis-result-primary-row">
       <article className={ventricularBeats > 0 ? 'analysis-result-risk' : 'analysis-result-calm'}>
         <span>{ventricularBeats > 0 ? '模型筛查提示 · 需结合症状评估' : '模型筛查结果'}</span>
-        <strong>{ventricularBeats > 0
-          ? `${usesMergedVfClass ? 'VF 合并类' : '室性早搏'}标记 ${ventricularBeats} 拍`
-          : prediction.label ?? '未产生分类结论'}</strong>
-        <p>{ventricularBeats > 0 && beatTotal > 0
-          ? `逐拍分类标记占本次检测心拍的 ${(ventricularBeats / beatTotal * 100).toFixed(1)}%。模型标记不等同于临床诊断。`
-          : prediction.explanation || '模型输出用于辅助回顾，不构成临床诊断。'}</p>
+        <strong>{ventricularBeats > 0 ? `${isHgb ? 'VF 合并类' : 'V 类'}标记 ${ventricularBeats} 拍` : prediction.label ?? '未产生分类结论'}</strong>
+        <p>{ventricularBeats > 0 ? '可在事件清单中定位波形，供回顾与沟通。' : prediction.explanation || '模型输出用于辅助回顾。'}</p>
       </article>
-      <article className="analysis-result-rate">
-        <span>平均心率 <small>参考 60–100</small></span>
-        <strong>{bpm == null ? '—' : bpm} <small>次/分</small></strong>
-        <p>节律 {regularityText}{rrMeanMs != null ? ` · RR ${Math.round(rrMeanMs)} ms` : ''}</p>
-      </article>
-      <article className="analysis-result-beats"><span>心拍分类分布 · 共 {beatTotal} 拍</span>
-        <div className="analysis-class-bar" aria-hidden="true">
-          {beatClasses.map(({code, count}) =>
-            <i key={code} style={{width: `${count / Math.max(beatTotal, 1) * 100}%`}} />)}
+      <article className="analysis-result-beats"><span>心拍分类分布 · 共 {beatAnalysis?.total ?? prediction.beats?.count ?? 0} 拍</span>
+        <div className="analysis-class-bar" aria-label={`正常 ${normalBeats}，S 类 ${atrialBeats}，V 类 ${ventricularBeats}，融合 ${fusionBeats}`}>
+          <i style={{width: `${normalBeats / Math.max(beatAnalysis?.total ?? prediction.beats?.count ?? 1, 1) * 100}%`}} />
+          <i style={{width: `${atrialBeats / Math.max(beatAnalysis?.total ?? prediction.beats?.count ?? 1, 1) * 100}%`}} />
+          <i style={{width: `${ventricularBeats / Math.max(beatAnalysis?.total ?? prediction.beats?.count ?? 1, 1) * 100}%`}} />
+          <i style={{width: `${fusionBeats / Math.max(beatAnalysis?.total ?? prediction.beats?.count ?? 1, 1) * 100}%`}} />
         </div>
-        <div className="analysis-beat-counts">
-          {beatClasses.map(({code, count}) => <strong key={code}><span>{code}</span><b>{count}</b></strong>)}
+        <div className="analysis-beat-counts" aria-label={`N ${normalBeats}，S ${atrialBeats}，V ${ventricularBeats}，F ${fusionBeats}`}>
+          <strong><span>N</span><b>{normalBeats}</b></strong>
+          <strong><span>S</span><b>{atrialBeats}</b></strong>
+          <strong><span>{isHgb ? 'VF' : 'V'}</span><b>{ventricularBeats}</b></strong>
+          {!isHgb && <strong><span>F</span><b>{fusionBeats}</b></strong>}
         </div>
-        <p>分类计数仅适用于本次信号与所选模型</p></article>
+        <p>{unknownBeats > 0 ? `未分类 ${unknownBeats} 拍 · ` : ''}分类计数仅适用于本次信号与所选模型</p></article>
+      <article className="analysis-result-rate"><span>平均心率 <small>参考 60–100</small></span><strong>{bpm == null ? '—' : bpm} <small>次/分</small></strong>
+        <p>节律 {regularityText}{rrMeanMs != null ? ` · RR ${Math.round(rrMeanMs)} ms` : ''}</p></article>
       </div>
       <div className="analysis-result-secondary-row">
       {rhythmAnalysis && <article className="analysis-result-model">
@@ -324,7 +391,7 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       </article>}
       {respirationAnalysis && <article className="analysis-result-model">
         <span>呼吸阻抗</span><strong>{respirationAnalysis.rate_bpm == null ? '未获得呼吸率' : `${respirationAnalysis.rate_bpm} 次/分`}</strong>
-        <p>{respirationAnalysis.cycle_count ?? 0} 个周期 · 长间隔 {respirationAnalysis.pause_candidates.length}</p>
+        <p>{respirationSummary}</p>
       </article>}
       <article className={`analysis-result-quality-card ${quality.status === 'insufficient' ? 'analysis-result-quality-fail' : ''}`}>
         <span>信号质量 <QualityBadge status={quality.status} /></span>
@@ -356,25 +423,40 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     </div>
 
     {detailTab === 'overview' && <div className="analysis-wave-column analysis-wave-review">
-      <div className="analysis-wave-heading"><div><h2>心电波形审阅</h2><span>{duration.toFixed(2)} 秒 · {record.sample_rate_hz} Hz · {result.unit ?? 'mV'}</span></div>
+      <div className="analysis-wave-heading"><div><h2 ref={waveHeading} tabIndex={-1}>心电波形审阅</h2><span>{duration.toFixed(2)} 秒 · {record.sample_rate_hz} Hz · {result.unit ?? 'mV'}</span></div>
+        <div className="review-wave-controls">
+        <div className="analysis-range-buttons" role="group" aria-label="波形类型">
+          <button aria-pressed={!filtered} className={!filtered ? 'selected' : ''} onClick={() => setFiltered(false)}>原始</button>
+          <button aria-pressed={filtered} className={filtered ? 'selected' : ''} disabled={!result.waveform_processed_mV?.length}
+            onClick={() => setFiltered(true)}>滤波</button>
+        </div>
         <div className="analysis-range-buttons" role="group" aria-label="波形时间范围">
-          {waveformRanges.map(({length, label}) => <button key={length}
-            aria-pressed={windowLength === length}
+          {([10, 30, 'all'] as const).map(length => <button key={length} aria-pressed={windowLength === length}
             className={windowLength === length ? 'selected' : ''} onClick={() => {
               setWindowLength(length);
               setWindowStart(length === 'all' ? 0 : Math.min(windowStart, Math.max(0, duration - length)));
-            }}>{label}</button>)}
+              setSelectedAbnormal(null);
+            }}>{length === 'all' ? '全程' : `${length}s`}</button>)}
+        </div>
         </div>
       </div>
       {abnormalRows.length > 0 && <div className="analysis-abnormal-nav">
-        <span>异常心拍（{abnormalRows.length}）</span>
+        <span>事件复核（{abnormalRows.length}）</span>
         <button className="secondary" onClick={() => jumpToAbnormal(-1)} aria-label="上一个异常心拍">‹</button>
         <button className="secondary" onClick={() => jumpToAbnormal(1)}>定位下一个 →</button>
-        <small>{selectedAbnormal == null ? '—' : selectedAbnormal + 1} / {abnormalRows.length}</small>
+        <small aria-live="polite">{selectedAbnormal != null
+          ? `已定位 ${abnormalRows[selectedAbnormal]?.time_sec.toFixed(2)} 秒 · ${selectedAbnormal + 1} / ${abnormalRows.length}`
+          : '可定位非 N 类和未分类心拍'}</small>
       </div>}
-      <p className="analysis-window-caption">窗口 {windowStart.toFixed(1)}–{windowEnd.toFixed(1)} 秒 · 红色标记为非 N 类逐拍结果</p>
-      <Waveform values={displayedWaveform} duration={Math.max(windowEnd - windowStart, 0.01)}
-        offset={windowStart} unit={result.unit ?? 'mV'} markers={beatMarkers} />
+      <p className="analysis-window-caption">窗口 {windowStart.toFixed(2)}–{windowEnd.toFixed(2)} 秒{classified && ' · 红色标记为非 N 类或未分类心拍'}</p>
+      <Waveform values={displayedWaveform} duration={traceDuration}
+        offset={traceOffset} unit={result.unit ?? 'mV'} markers={beatMarkers} />
+      <div className="respiration-heading"><h2>呼吸波形</h2></div>
+      {displayedRespiration.length > 0
+        ? <Waveform channel="respiration" values={displayedRespiration} duration={traceDuration}
+          offset={traceOffset} sampleRate={respirationRate} sampleOffset={respirationStart / respirationRate}
+          unit={result.respiration_unit === 'adc_counts_relative' ? '相对 ADC 计数' : result.respiration_unit ?? '相对值'} />
+        : <p className="empty-state">{result.respiration_waveform?.length ? '当前窗口没有呼吸样本。' : '该记录没有呼吸通道。'}</p>}
       <div className="analysis-minimap-wrap">
         <div className="analysis-minimap">
           <svg viewBox="0 0 1000 56" preserveAspectRatio="none" aria-hidden="true">
@@ -382,13 +464,20 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
             {abnormalRows.map((marker, index) => <line key={`${marker.time_sec}-${index}`}
               x1={duration ? marker.time_sec / duration * 1000 : 0} x2={duration ? marker.time_sec / duration * 1000 : 0}
               y1="3" y2="53" className="analysis-minimap-event" />)}
-            <rect x={duration ? windowStart / duration * 1000 : 0} y="2"
-              width={duration ? Math.max(8, (windowEnd - windowStart) / duration * 1000) : 0} height="52"
-              className="analysis-minimap-window" />
+            {duration > 0 && <rect x={windowStart / duration * 1000} y="2"
+              width={(windowEnd - windowStart) / duration * 1000} height="52"
+              className="analysis-minimap-window" />}
           </svg>
         </div>
-        <input type="range" min={0} max={maxWindowStart} step={Math.max(0.05, duration / 1000)} value={Math.min(windowStart, maxWindowStart)}
-          disabled={maxWindowStart === 0} onChange={event => setWindowStart(Number(event.target.value))} aria-label="拖动浏览心电全程" />
+        <input type="range" min={0} max={maxWindowStart} step="any" value={Math.min(windowStart, maxWindowStart)}
+          disabled={maxWindowStart === 0} onChange={event => {setWindowStart(Number(event.target.value)); setSelectedAbnormal(null);}}
+          onKeyDown={event => {
+            const amount = ({ArrowLeft: -0.5, ArrowDown: -0.5, ArrowRight: 0.5, ArrowUp: 0.5})[event.key];
+            if (amount === undefined) return;
+            event.preventDefault();
+            setWindowStart(value => Math.max(0, Math.min(maxWindowStart, value + amount)));
+            setSelectedAbnormal(null);
+          }} aria-label="拖动浏览心电全程" />
         <div className="analysis-minimap-labels"><span>0 秒</span><span>{duration.toFixed(0)} 秒</span></div>
       </div>
     </div>}
@@ -402,10 +491,11 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
             <thead><tr><th>序号</th><th>发生时间</th><th>AAMI 分类</th><th>RR 间期</th><th>瞬时心率</th><th>定位</th></tr></thead>
             <tbody>{abnormalRows.map((event, index) => <tr key={`${event.number}-${event.time_sec}`}>
               <td>#{event.number}</td><td>{event.time_sec.toFixed(2)} s</td>
-              <td className={event.label === 'V' ? 'event-v' : 'event-s'}>{event.aamiLabel}</td>
+              <td className={event.label === 'V' || event.label === 'VF' ? 'event-v' : 'event-s'}>{event.label}</td>
               <td>{event.rrMs == null ? '—' : `${event.rrMs} ms`}</td>
               <td>{event.bpm == null ? '—' : `${event.bpm} BPM`}</td>
-              <td><button className="analysis-locate-button" onClick={() => locateAbnormal(index)}>查看波形 →</button></td>
+              <td><button className="analysis-locate-button" aria-label={`查看第 ${event.number} 拍波形`}
+                onClick={() => locateAbnormal(index)}>查看波形 →</button></td>
             </tr>)}</tbody>
           </table></div> : <p className="analysis-empty-events">当前没有可显示的异常心拍事件。</p>}
         </section>
@@ -414,6 +504,29 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
           <dl>{metadata.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
         </section>
       </div>
+      {orderedBeatMarkers.length > 0 && <details className="analysis-model-extra">
+        <summary>完整逐拍结果（{orderedBeatMarkers.length}）</summary>
+        <div className="analysis-event-table-wrap"><table className="analysis-event-table">
+          <thead><tr><th>拍</th><th>时间</th><th>类别</th><th>模型概率</th></tr></thead>
+          <tbody>{orderedBeatMarkers.slice(0, beatLimit).map((event, index) => <tr key={index}>
+            <td>{index + 1}</td><td>{event.time_sec.toFixed(3)} 秒</td>
+            <td>{classified ? event.label : '未分类'}</td><td>{event.confidence == null ? '—' : `${(event.confidence * 100).toFixed(1)}%`}</td>
+          </tr>)}</tbody>
+        </table></div>
+        {beatLimit < orderedBeatMarkers.length && <button className="secondary" onClick={() => setBeatLimit(value => value + 100)}>显示更多心拍</button>}
+      </details>}
+      {quality.metrics && <details className="analysis-model-extra">
+        <summary>查看信号质量指标</summary>
+        <dl className="review-quality">
+          <div><dt>基线漂移比例</dt><dd>{quality.metrics.baseline_wander?.ratio == null ? '—' : (quality.metrics.baseline_wander.ratio * 100).toFixed(1) + '%'}</dd></div>
+          <div><dt>工频干扰</dt><dd>{quality.metrics.powerline_interference?.frequency_hz == null ? '—' : quality.metrics.powerline_interference.frequency_hz + ' Hz'}</dd></div>
+          <div><dt>平直片段</dt><dd>{quality.metrics.flatline == null ? '—' : (quality.metrics.flatline.fraction * 100).toFixed(1) + '%'}</dd></div>
+          <div><dt>导联脱落</dt><dd>{quality.metrics.lead_off == null ? '—' : quality.metrics.lead_off.suspected ? '疑似' : '未发现明显线索'}</dd></div>
+          <div><dt>估算 SNR</dt><dd>{quality.metrics.snr?.db == null ? '—' : quality.metrics.snr.db.toFixed(1) + ' dB'}</dd></div>
+          <div><dt>心拍一致性 bSQI</dt><dd>{quality.metrics.bsqi?.score == null ? '—' : (quality.metrics.bsqi.score * 100).toFixed(1) + '%'}</dd></div>
+        </dl>
+        {(quality.guidance ?? []).map(item => <p className="hint" key={item}>{item}</p>)}
+      </details>}
       <details className="analysis-model-extra">
         <summary>查看模型计算与风险规则详情</summary>
         {(beatAnalysis || rhythmAnalysis || rateAnalysis || respirationAnalysis || safety) &&
@@ -423,11 +536,11 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
               {rhythmAnalysis && <article className="analysis-card"><span className="analysis-kicker">整段节律 · OpenECG</span><strong>{rhythmAnalysis.primary}</strong>
                 <p>置信度：{rhythmAnalysis.confidence == null ? '—' : `${(rhythmAnalysis.confidence * 100).toFixed(0)}%`}</p><p>模型：{rhythmAnalysis.model_version ?? '—'}</p></article>}
               {beatAnalysis && <article className="analysis-card"><span className="analysis-kicker">逐心拍 · {beatAnalysis.source}</span><strong>{beatAnalysis.total} 个心拍</strong>
-                <p>{beatClasses.map(({code, count}) => `${code} ${count}`).join(' · ')}</p><p>状态：{beatAnalysis.status}</p></article>}
+                <p>N {beatAnalysis.counts.normal ?? 0} · S {beatAnalysis.counts.pac ?? 0} · V {beatAnalysis.counts.pvc ?? 0} · F {beatAnalysis.counts.fusion ?? 0}</p><p>状态：{beatAnalysis.status}</p></article>}
               {rateAnalysis && <article className="analysis-card"><span className="analysis-kicker">心率与 RR</span><strong>{rateAnalysis.average_bpm == null ? '未获得' : `${rateAnalysis.average_bpm} 次/分`}</strong>
                 <p>规则性：{regularityText}</p><p>平均 RR：{rrMeanMs == null ? '—' : `${rrMeanMs} ms`}</p></article>}
               {respirationAnalysis && <article className="analysis-card"><span className="analysis-kicker">呼吸阻抗</span><strong>{respirationAnalysis.rate_bpm == null ? '未获得呼吸率' : `${respirationAnalysis.rate_bpm} 次/分`}</strong>
-                <p>分析器：{respirationAnalysis.provider}</p><p>周期 {respirationAnalysis.cycle_count ?? 0} · 长间隔 {respirationAnalysis.pause_candidates.length}</p></article>}
+                <p>分析器：{respirationAnalysis.provider}</p><p>{respirationSummary}</p></article>}
               {safety && <article className={`analysis-card safety-${safety.level}`}><span className="analysis-kicker">固定安全规则</span><strong>{safety.level}</strong><p>{safety.message}</p></article>}
             </div>
             {beatAnalysis?.limitations?.map(item => <p className="hint" key={item}>{item}</p>)}
@@ -440,22 +553,12 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     </div>}
 
     {detailTab === 'notes' && <div className="analysis-tab-content analysis-notes-layout">
-      <div className="care-advice-grid">
-        <section><h2>长辈当下照护要点</h2><ul>
-          <li>先静坐或半卧位休息 15 分钟，避免急起急走与劳累。</li>
-          <li>暂时停饮浓茶、咖啡，保持情绪平稳、呼吸均匀。</li>
-          <li>若持续胸闷、眼前发黑或气短，请尽快告知家属并及时就医。</li>
-        </ul></section>
-        <section><h2>日常预防与随访建议</h2><ul>
-          <li>保持规律睡眠，按医嘱服用降压及其他慢病药物。</li>
-          <li>可在晨起或睡前静息时测量并记录，持续观察个人变化。</li>
-          <li>就诊时可提供心电图片、逐拍 CSV 和当时的身体感受。</li>
-        </ul></section>
-        <p className="care-followup"><span aria-hidden="true">◷</span> 复测时机：静坐休息约 15 分钟后再测，并按医生建议安排随访。</p>
-      </div>
       {detail && !modelMissing && <section className="explanation analysis-interpretation-card">
       <div className="analysis-notes-heading"><div><span>AI 辅助解读</span><h2>本次记录说明</h2></div>
-        {detail.provider && <span className="analysis-provider">{detail.provider === 'deepseek' ? 'DeepSeek' : '本地模板'}</span>}
+        {detail.provider && <span className="analysis-provider">
+          {detail.provider === 'deepseek' ? 'DeepSeek'
+            : detail.provider === 'openai_compatible' ? detail.model || '兼容 API' : '本地模板'}
+        </span>}
       </div>
       {detail.elderly_summary && <div className="plain-summary">
         <span>先看结论</span><p>{detail.elderly_summary}</p>
@@ -476,7 +579,21 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
       {detail.next_steps?.length ? <><h3>下一步建议</h3><ul>{detail.next_steps.map(item => <li key={item}>{item}</li>)}</ul></> : null}
     </section>}
 
-    {owned ? <section className="note-editor analysis-personal-note">
+    {owned && <section className="review-rename"><h2>记录名称</h2>
+      <form onSubmit={event => {event.preventDefault(); void saveTitle();}}>
+        <input aria-label="记录名称" value={title} maxLength={80} onChange={event => setTitle(event.target.value)} />
+        <button className="secondary" disabled={titleSaving}>保存名称</button>
+      </form>
+      {titleMessage && <p role="status">{titleMessage}</p>}
+    </section>}
+    {record.root_record_id ? <section className="record-origin-note"><h2>测量时的身体状况</h2>
+      <p>此记录沿用<Link to={'/records/' + record.root_record_id}>原始测量记录</Link>的测量信息。</p>
+      <dl>
+        <div><dt>当时在做什么</dt><dd>{formatBodyContext(record.body_context?.scene, 'scene')}</dd></div>
+        <div><dt>当时的感受</dt><dd>{formatBodyContext(record.body_context?.feeling, 'feeling')}</dd></div>
+      </dl>
+    </section> : owned && <BodyContextForm key={record.id} id={record.id} context={record.body_context} />}
+    {owned && !record.root_record_id ? <section className="note-editor analysis-personal-note">
       <div className="analysis-notes-heading"><div><span>个人补充</span><h2>测量备注</h2></div>
         <span className="analysis-note-count">{note.length} / 500</span></div>
       <textarea value={note} maxLength={500} rows={3} placeholder="例如：测量时间、服药情况、当时感受"

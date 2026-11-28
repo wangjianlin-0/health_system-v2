@@ -135,7 +135,12 @@ def test_health_reports_database_and_limits(client):
     assert body['database']['schema_version'] >= 3
     assert body['model']['type'] == 'none'
     assert body['model_catalog']['openecg']['backend'] == 'onnxruntime'
-    assert body['model_catalog']['openecg']['asset']['sha256']
+    openecg = body['model_catalog']['openecg']
+    if openecg['status'] == 'available':
+        assert len(openecg['asset']['sha256']) == 64
+    else:
+        assert openecg['status'] == 'unavailable'
+        assert openecg['asset']['sha256'] is None
     assert body['model_catalog']['ensemble']['policy'].startswith('CNN primary')
     assert body['capabilities']['max_upload_bytes'] == 5_000_000
     assert body['tasks']['mode'] == 'inprocess'

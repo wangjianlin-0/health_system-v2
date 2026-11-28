@@ -57,19 +57,33 @@ def stop_capture(sid: str, user: str = Depends(current_user)):
     return acquisition.get(user, sid).stop()
 
 
+class CaptureSaveOptions(BaseModel):
+    title: str = Field(default='', max_length=80)
+
+
 @router.post('/sessions/{sid}/save', status_code=202)
-def save_capture(sid: str, user: str = Depends(current_user)):
+def save_capture(sid: str, body: CaptureSaveOptions | None = None, user: str = Depends(current_user)):
     session = acquisition.get(user, sid)
     with session.lock:
         if session.task is None:
-            session.task = records.submit(user, session.signal(), idempotency_key='capture-' + sid)
+            signal = session.signal()
+            if body and body.title.strip():
+                signal["record_title"] = body.title.strip()
+            session.task = records.submit(user, signal, idempotency_key='capture-' + sid)
             records.store_raw_input(user, session.task['id'], (session.directory / 'samples.csv').read_bytes())
             runner.enqueue(session.task['id'])
         return session.task
 
 
-@router.post('/replay', status_code=202)
-def replay(user: str = Depends(current_user)):
-    task = records.submit(user, sample())
+class ReplayOptions(BaseModel):
+    title: str = Field(default="", max_length=80)
+
+
+@router.post("/replay", status_code=202)
+def replay(body: ReplayOptions | None = None, user: str = Depends(current_user)):
+    signal = sample()
+    if body and body.title.strip():
+        signal["record_title"] = body.title.strip()
+    task = records.submit(user, signal)
     runner.enqueue(task['id'])
     return task

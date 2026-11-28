@@ -11,6 +11,17 @@ class Credentials(BaseModel):
     username: str = Field(min_length=1, max_length=80)
     password: str = Field(min_length=8, max_length=256)
 
+
+class ProfileUpdate(BaseModel):
+    username: str = Field(min_length=1, max_length=80)
+    age: int | None = Field(default=None, ge=1, le=120)
+    sex: str | None = Field(default=None, pattern="^(female|male|other|undisclosed)$")
+
+
+class PasswordUpdate(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=256)
+
 def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
     if not credentials or credentials.scheme.lower() != 'bearer':
         raise PermissionError('请登录')
@@ -27,3 +38,19 @@ def login(body: Credentials):
 @router.post('/logout')
 def logout(user: str = Depends(current_user), credentials=Depends(bearer)):
     return family.logout(credentials.credentials)
+
+
+
+@router.get("/profile")
+def profile(user: str = Depends(current_user)):
+    return family.profile(user)
+
+
+@router.patch("/profile")
+def update_profile(body: ProfileUpdate, user: str = Depends(current_user)):
+    return family.update_profile(user, body.username, body.age, body.sex)
+
+
+@router.post("/password")
+def update_password(body: PasswordUpdate, user: str = Depends(current_user)):
+    return family.update_password(user, body.current_password, body.new_password)
