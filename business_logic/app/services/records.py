@@ -958,15 +958,18 @@ def export_record(user: str, identifier: str, format: str = "csv"):
     prediction = result.get("prediction", {})
     heart_rate = prediction.get("heart_rate") or {}
     respiration_rate = (result.get("respiration_analysis") or {}).get("rate_bpm")
+    respiration = result.get("respiration_waveform") or []
     output = io.StringIO(newline="")
     writer = csv.DictWriter(output, fieldnames=[
         "timestamp_sec", "value", "sample_rate_hz", "unit", "source",
         "quality_status", "quality_reasons", "heart_rate_bpm", "record_id", "created_at",
-        "respiration_rate_bpm",
+        "respiration_rate_bpm", "respiration_value", "respiration_unit",
     ])
     writer.writeheader()
     values = result.get("waveform") or []
     rate = float(result.get("sample_rate_hz") or 1)
+    paired_respiration = (len(respiration) == len(values)
+                          and float(result.get("respiration_sample_rate_hz") or 0) == rate)
     for index, value in enumerate(values):
         writer.writerow({
             "timestamp_sec": index / rate,
@@ -980,6 +983,8 @@ def export_record(user: str, identifier: str, format: str = "csv"):
             "record_id": record.get("id"),
             "created_at": record.get("created_at"),
             "respiration_rate_bpm": respiration_rate,
+            "respiration_value": respiration[index] if paired_respiration else None,
+            "respiration_unit": result.get("respiration_unit") if paired_respiration else None,
         })
     return "\ufeff" + output.getvalue(), "text/csv; charset=utf-8"
 
@@ -1024,6 +1029,17 @@ def detail(user: str, identifier: str):
             signal_row["data"], signal_row["encoding"], signal_row["n_samples"])
     elif "waveform" not in result:
         result["waveform"] = []
+    if (not result.get("respiration_waveform") and row["input_path"]
+            and result.get("source") in {"ads1292r_bluetooth", "ads1292r_csv"}):
+        try:
+            path = Path(row["input_path"]).resolve()
+            path.relative_to(settings.upload_dir.resolve())
+            signal = {"samples": result.get("waveform_raw_mV") or result["waveform"],
+                      "sample_rate_hz": result["sample_rate_hz"]}
+            _restore_capture_respiration(signal, path.read_bytes())
+            result.update({field: signal[field] for field in RESPIRATION_FIELDS if field in signal})
+        except (OSError, ValueError, KeyError):
+            pass
     for key, value in _record_summary(row, payload).items():
         if value is not None:
             payload[key] = value

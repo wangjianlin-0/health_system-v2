@@ -6,13 +6,16 @@ import Waveform from '../components/Waveform';
 interface Capture {
   id: string; status: string; error: string | null; port: string; baud: number; format: string;
   model: string; sample_count: number; duration_sec: number; received_bytes: number;
-  points: (WaveformPoint & {raw: number})[]; prediction: Prediction | null;
+  points: (WaveformPoint & {raw: number; respiration?: number})[]; prediction: Prediction | null;
   analysis_samples: number; analysis_pending: boolean; pending_bytes: number;
   task: AnalysisTask | null;
 }
 interface Port {port: string; label: string;}
 const statusLabel: Record<string, string> = {running: '采集中', stopped: '已停止', error: '采集已中断',
   starting: '连接中', limit_reached: '达到记录上限'};
+const beatNames: Record<string, string> = {
+  N: '正常类', S: '室上性异位类', V: '室性异位类', F: '融合类', VF: '室性／融合合并类',
+};
 
 export default function Monitor() {
   const [ports, setPorts] = useState<Port[]>([]);
@@ -66,8 +69,20 @@ export default function Monitor() {
   const earliestTime = availablePoints[0]?.t ?? 0;
   const visibleDuration = Math.min(windowSeconds, Math.max(0.1, latestTime - earliestTime));
   const start = Math.max(earliestTime, latestTime - visibleDuration);
-  const visiblePoints = availablePoints.filter(point => point.t >= start).map(p => ({t: p.t, v: raw ? p.raw : p.v}));
+  const visibleSamples = availablePoints.filter(point => point.t >= start);
+  const visiblePoints = visibleSamples.map(p => ({t: p.t, v: raw ? p.raw : p.v}));
+  const respirationPoints = visibleSamples.flatMap(({t, respiration}) =>
+    respiration == null ? [] : [{t, v: respiration}]);
   const duration = visiblePoints.length > 1 ? visiblePoints[visiblePoints.length - 1].t - start : Math.max(visibleDuration, 0.1);
+  const selectedModel = session?.model ?? model;
+  const beatClasses = selectedModel === 'hgb' ? ['N', 'S', 'VF'] : ['N', 'S', 'V', 'F'];
+  const beats = session?.prediction?.beats;
+  const classificationStatus = session?.prediction?.status === 'model_unavailable'
+    ? session.prediction.explanation
+    : beats
+      ? active ? '采集中 · 累计已判定心拍'
+        : session?.prediction?.preview && session.analysis_pending ? '正在完成末尾心拍分析' : '本次采集累计'
+      : active ? '正在等待首批可判定心拍' : '开始采集后自动统计';
   return <section className="monitor-page live-monitor-page">
     <p className="eyebrow monitor-page-eyebrow">设备连接与测量</p>
     <h1 className="monitor-page-title">实时心电监测</h1>
@@ -135,7 +150,7 @@ export default function Monitor() {
     <div className="monitor-wave-panel">
     <div className="monitor-wave-heading"><div><h2>实时心电波形</h2><span>最近 {visibleDuration.toFixed(1)} 秒 · 可拖动调整窗口</span></div>
       <span className={`capture-status ${active ? 'is-active' : ''}`}>{active ? '数据流动中' : '等待采集'}</span></div>
-    <div className="wave-toolbar"><strong>最近 5 秒</strong>
+    <div className="wave-toolbar"><strong>波形显示</strong>
       <div className="monitor-segmented" role="group" aria-label="波形类型">
         <button className={!raw ? 'selected' : ''} onClick={() => setRaw(false)}>滤波显示</button>
         <button className={raw ? 'selected' : ''} onClick={() => setRaw(true)}>原始信号</button>
@@ -149,9 +164,26 @@ export default function Monitor() {
       <span>{windowSeconds.toFixed(1)} 秒</span>
     </label>
     <Waveform points={visiblePoints} duration={duration} offset={start} unit="mV" />
-    <p className="hint monitor-wave-note">波形持续更新；心拍分类约每 4 秒重算本轮完整记录，在线结果至少滞后 2.5 秒，停止后再做整段分析。</p>
+    <div className="respiration-heading"><h2>实时呼吸波形</h2><span>ADS1292R CH1 · 原始码值</span></div>
+    <Waveform channel="respiration" points={respirationPoints} duration={duration} offset={start} unit="ADC 计数" />
     </div>
-    {session?.prediction?.status === 'model_unavailable' && <p className="notice notice-error">{session.prediction.explanation}</p>}
-    {!session?.prediction && <p className="empty-state">采集至少 4 秒后，可查看心率预览；保存后在记录详情查看完整分类。</p>}
+    <section className="monitor-wave-panel monitor-beats" aria-labelledby="monitor-beats-title">
+      <div className="monitor-wave-heading"><div><h2 id="monitor-beats-title">AI 实时心拍分类</h2>
+        <span>{selectedModel === 'hgb' ? 'HGB v92' : selectedModel === 'ensemble' ? 'CNN H27 · HGB 复核' : 'CNN H27'}</span>
+      </div></div>
+      <div className="monitor-strip" aria-label="本次采集的累计心拍分类">
+        {beatClasses.map(label => <div key={label}>
+          <span className="beat-class-label">{label} · {beatNames[label]}</span>
+          <strong>{beats?.by_type?.[label] ?? '—'}<small>拍</small></strong>
+        </div>)}
+        <div>
+          <span className="beat-class-label">未分类</span>
+          <strong>{beats?.unclassified_count ?? '—'}<small>拍</small></strong>
+          <p className="beat-class-note">如波形不完整的心拍</p>
+        </div>
+      </div>
+      <p className="hint monitor-wave-note" role="status">{classificationStatus}
+        {active && '。模型分批更新，最近约 2.5 秒的心拍待判定。'}</p>
+    </section>
   </section>;
 }

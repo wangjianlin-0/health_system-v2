@@ -247,6 +247,12 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
   const sampleStart = Math.max(0, Math.floor(windowStart * result.sample_rate_hz));
   const sampleEnd = Math.min(result.waveform?.length ?? 0, Math.ceil(windowEnd * result.sample_rate_hz));
   const displayedWaveform = (filtered ? result.waveform_processed_mV ?? [] : result.waveform ?? []).slice(sampleStart, sampleEnd);
+  const traceOffset = sampleStart / result.sample_rate_hz;
+  const traceDuration = Math.max(0, (displayedWaveform.length - 1) / result.sample_rate_hz);
+  const respirationRate = result.respiration_sample_rate_hz || result.sample_rate_hz;
+  const respirationStart = Math.ceil(sampleStart * respirationRate / result.sample_rate_hz);
+  const respirationEnd = 1 + Math.floor((sampleEnd - 1) * respirationRate / result.sample_rate_hz);
+  const displayedRespiration = result.respiration_waveform?.slice(respirationStart, respirationEnd) ?? [];
   const sourceEvents: BeatEvent[] = beatAnalysis?.events ?? (prediction.beats?.items ?? []).map(item => ({
     time_sec: item.r_seconds, sample: item.r_sample500, label: item.valid ? item.label : 'unknown',
     confidence: item.confidence, raw_label: item.label,
@@ -443,8 +449,14 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
           : '可定位非 N 类和未分类心拍'}</small>
       </div>}
       <p className="analysis-window-caption">窗口 {windowStart.toFixed(2)}–{windowEnd.toFixed(2)} 秒{classified && ' · 红色标记为非 N 类或未分类心拍'}</p>
-      <Waveform values={displayedWaveform} duration={Math.max(0, (displayedWaveform.length - 1) / result.sample_rate_hz)}
-        offset={sampleStart / result.sample_rate_hz} unit={result.unit ?? 'mV'} markers={beatMarkers} />
+      <Waveform values={displayedWaveform} duration={traceDuration}
+        offset={traceOffset} unit={result.unit ?? 'mV'} markers={beatMarkers} />
+      <div className="respiration-heading"><h2>呼吸波形</h2></div>
+      {displayedRespiration.length > 0
+        ? <Waveform channel="respiration" values={displayedRespiration} duration={traceDuration}
+          offset={traceOffset} sampleRate={respirationRate} sampleOffset={respirationStart / respirationRate}
+          unit={result.respiration_unit === 'adc_counts_relative' ? '相对 ADC 计数' : result.respiration_unit ?? '相对值'} />
+        : <p className="empty-state">{result.respiration_waveform?.length ? '当前窗口没有呼吸样本。' : '该记录没有呼吸通道。'}</p>}
       <div className="analysis-minimap-wrap">
         <div className="analysis-minimap">
           <svg viewBox="0 0 1000 56" preserveAspectRatio="none" aria-hidden="true">
@@ -543,7 +555,10 @@ export default function RecordDetail({record, onDelete, onBack, deleting}: {
     {detailTab === 'notes' && <div className="analysis-tab-content analysis-notes-layout">
       {detail && !modelMissing && <section className="explanation analysis-interpretation-card">
       <div className="analysis-notes-heading"><div><span>AI 辅助解读</span><h2>本次记录说明</h2></div>
-        {detail.provider && <span className="analysis-provider">{detail.provider === 'deepseek' ? 'DeepSeek' : '本地模板'}</span>}
+        {detail.provider && <span className="analysis-provider">
+          {detail.provider === 'deepseek' ? 'DeepSeek'
+            : detail.provider === 'openai_compatible' ? detail.model || '兼容 API' : '本地模板'}
+        </span>}
       </div>
       {detail.elderly_summary && <div className="plain-summary">
         <span>先看结论</span><p>{detail.elderly_summary}</p>

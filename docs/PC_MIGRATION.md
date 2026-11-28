@@ -8,13 +8,18 @@
 
 `requirements-pc-lock.txt` 记录了 2026-11-12 验收时的依赖版本。复建当前版本时，请按下方命令安装 CPU PyTorch 和 `requirements-dev.txt`，后者包含计算呼吸率所需的 NeuroKit2。
 
-从工程根目录执行：
+在 Windows 文件资源管理器中双击项目根目录下的 `open_project.cmd`。脚本会构建前端，优先使用 `8000`，遇到端口占用时依次尝试到 `8010`。服务就绪后会打开默认浏览器，命令窗口也会显示实际网址。整段端口都被占用时，可在 PowerShell 中执行 `.\open_project.cmd -Port 8020`，从 `8020` 开始尝试。
+
+手动启动时，在项目根目录执行下列命令。已有当前版本的前端构建时，可以跳过前三行。
 
 ```powershell
-./start_pc.ps1
+Set-Location frontend
+npm.cmd run build
+Set-Location ..
+.\start_pc.ps1 -Port 8000
 ```
 
-打开 http://127.0.0.1:8000 ，使用原有账号或注册本地账号。这个入口用同一端口提供已构建网页和 API；无需另开 Vite。若端口占用，可用 `./start_pc.ps1 -Port 8010`。停止服务按 Ctrl+C。数据保存在项目 `runtime/`，不会上传到 GitHub。
+首次构建前，先在 `frontend` 目录运行 `npm.cmd ci`。手动启动后，打开窗口显示的网址，使用原有账号或注册本地账号。手动指定端口被占用时，可用 `.\start_pc.ps1 -Port 8010` 改用其他端口。使用 `.\start_pc.ps1 -Open` 可获得与双击脚本相同的行为。停止服务按 Ctrl+C。数据保存在项目 `runtime/`。
 
 首次换电脑时创建自己的共享环境并安装依赖：
 
@@ -32,6 +37,10 @@ cd ..
 自定义环境通过 `./start_pc.ps1 -Python '其他路径/Scripts/python.exe'` 指定。共享环境安装了课程后端和测试依赖；OpenECG 未安装到该环境，使用该选项前另装 `requirements-ai.txt`。旧 EXE 不会随源码自动升级；本轮交付是网页源码及启动入口。
 
 ## 使用
+
+需要大语言模型生成单条记录的报告解读时，双击 `open_project_with_report_api.cmd`，或在 PowerShell 中运行 `.\start_pc.ps1 -Open -ReportApi`。在终端选择 DeepSeek 或兼容 OpenAI 的 API，填写模型和密钥。密钥输入时隐藏，脚本将它传给本次启动的后端进程。也可以选本地模板。
+
+启动后导入、保存采集或重新分析记录，完成后在详情的「解读与备注」查看报告和来源。远端 API 会收到心拍统计、心率和信号质量等分析结果。CNN 在本机负责逐拍分类。请求失败时，报告会回退到本地模板。
 
 1. Windows 连接 JDY18 对应的蓝牙 USB 接收器或蓝牙虚拟串口。关闭占用同一串口的商家上位机及比赛网页。
 2. 打开“实时监测”，刷新并选择实际串口。默认 115200、8N1、无流控，不发送固件控制命令。

@@ -9,6 +9,7 @@ import pytest
 
 from ai_model.inference.edge_adapter import EdgeClassifier
 from hardware.realtime import Acquisition, Frames, Session
+from signal_processing.python.ecg_preprocessing import parse_csv
 from test_api_flow import account, wait_task
 
 
@@ -53,6 +54,7 @@ def test_bluetooth_capture_ownership_and_persistence(tmp_path):
         manager.start('other', 'COM8', 115200, 'document_34', 'cnn', tmp_path, serial_factory=Serial)
     manager.shutdown()
     assert session.reader.closed
+    assert [point['respiration'] for point in session.snapshot()['points'][:4]] == [0, -1, -2, -3]
     signal = session.signal()
     assert len(signal['samples']) == 16
     assert signal['samples'][0] == pytest.approx(1234 * 2420 / (6 * 8388608))
@@ -156,6 +158,7 @@ def test_capture_api_save_once_and_raw_file(client, monkeypatch, tmp_path):
     assert record['source'] == 'ads1292r_bluetooth'
     assert record['result']['acquisition']['continuity_verified'] is False
     assert record['result']['respiration_analysis']['rate_bpm'] == pytest.approx(15.0, abs=0.5)
+    assert record['result']['respiration_waveform'] == session.signal()['respiration_waveform']
     path = '/api/v1/records/' + record['id']
     raw = client.get(path + '/raw', headers=owner)
     assert raw.status_code == 200
@@ -166,6 +169,8 @@ def test_capture_api_save_once_and_raw_file(client, monkeypatch, tmp_path):
     row = next(csv.DictReader(io.StringIO(exported.text.lstrip('\ufeff'))))
     assert float(row['heart_rate_bpm']) == 75
     assert float(row['respiration_rate_bpm']) == record['result']['respiration_analysis']['rate_bpm']
+    assert parse_csv(exported.text, 500)['respiration_waveform'] == record['result']['respiration_waveform']
+    assert row['respiration_unit'] == 'adc_counts_relative'
 
     # Simulate a saved task from before the respiratory channel was forwarded.
     with connect() as db:

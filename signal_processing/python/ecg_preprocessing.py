@@ -32,7 +32,7 @@ def parse_csv(text, sample_rate_hz):
     rows = list(csv.reader(io.StringIO(text)))
     if not rows:
         raise ValueError('CSV 为空')
-    header = [cell.strip().lower() for cell in rows[0]]
+    header = [cell.strip().lstrip('\ufeff').lower() for cell in rows[0]]
     if 'ecg_raw' in header:
         col = header.index('ecg_raw')
         values = []
@@ -80,15 +80,18 @@ def parse_csv(text, sample_rate_hz):
     if 'ecg_filtered' in header:
         raise ValueError('ecg_filtered 单位未知，请提供 ecg_raw 或已转换的单列 mV')
     # Records exported by this application contain a calibrated `value` column
-    # alongside timestamp and metadata columns. Use only the ECG values, while
-    # checking that the export's declared units and sampling rate are usable.
+    # alongside timestamp, optional respiration samples and metadata columns.
     if 'value' in header:
         value_col = header.index('value')
         timestamp_col = header.index('timestamp_sec') if 'timestamp_sec' in header else None
         rate_col = header.index('sample_rate_hz') if 'sample_rate_hz' in header else None
         unit_col = header.index('unit') if 'unit' in header else None
+        resp_col = header.index('respiration_value') if 'respiration_value' in header else None
+        resp_unit_col = header.index('respiration_unit') if 'respiration_unit' in header else None
         values = []
         timestamps = []
+        respiration = []
+        respiration_units = set()
         for row in rows[1:]:
             if not row or all(not cell.strip() for cell in row):
                 continue
@@ -102,6 +105,10 @@ def parse_csv(text, sample_rate_hz):
                         raise ValueError('CSV 内的采样率与填写的采样率不一致')
                 if unit_col is not None and row[unit_col].strip().lower() != 'mv':
                     raise ValueError('value 列单位不是 mV，不能按 mV 信号导入')
+                if resp_col is not None and len(row) > resp_col and row[resp_col].strip():
+                    respiration.append(float(row[resp_col]))
+                    if resp_unit_col is not None and len(row) > resp_unit_col and row[resp_unit_col].strip():
+                        respiration_units.add(row[resp_unit_col].strip())
             except (ValueError, IndexError) as exc:
                 if str(exc).startswith('CSV 内') or str(exc).startswith('value 列'):
                     raise
@@ -113,8 +120,15 @@ def parse_csv(text, sample_rate_hz):
                 for a,b in zip(timestamps, timestamps[1:])
             ):
                 raise ValueError('时间戳不连续或与指定采样率不匹配，不自动补点')
-        return {'samples': values, 'sample_rate_hz': sample_rate_hz, 'unit': 'mV',
+        result = {'samples': values, 'sample_rate_hz': sample_rate_hz, 'unit': 'mV',
                 'lead': 'user_single_lead', 'source': 'csv_export'}
+        if respiration:
+            if (len(respiration) != len(values) or not all(map(math.isfinite, respiration))
+                    or len(respiration_units) > 1):
+                raise ValueError('CSV 的呼吸样本必须与心电逐行对应，且单位一致')
+            result.update(respiration_waveform=respiration, respiration_sample_rate_hz=float(sample_rate_hz),
+                          respiration_unit=next(iter(respiration_units), 'adc_counts_relative'))
+        return result
     values = []
     for index, row in enumerate(rows):
         if not row or not row[0].strip():

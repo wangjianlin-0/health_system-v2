@@ -54,6 +54,7 @@ export interface Prediction {
     next_steps?: string[];
     risk_level?: string;
     provider?: string;
+    model?: string;
   } | null;
 }
 export interface BeatEvent {
@@ -99,6 +100,9 @@ export interface EcgResult {
   source: string;
   waveform: number[];
   waveform_processed_mV?: number[];
+  respiration_waveform?: number[];
+  respiration_sample_rate_hz?: number;
+  respiration_unit?: string;
   sample_rate_hz: number;
   unit: string;
   duration_sec: number;

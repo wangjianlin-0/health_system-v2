@@ -48,7 +48,7 @@ export default function UploadForm({onSubmit, onReplay, busy, progress, error}: 
 
   return <form className="upload-form" onSubmit={submit}>
     <details className="upload-format-note"><summary>支持格式与采样说明</summary>
-      <p>支持单列 mV CSV（value/sample/mv 表头），或包含 ecg_raw 的 ADS1292R 原始 CSV。ADS1292R 按 2.42 V、6 倍增益换算。默认采样率 500 Hz，其他设备请按实际采样率修改。</p>
+      <p>支持单列 mV CSV、ADS1292R 原始 CSV 和本项目导出的记录 CSV。有呼吸通道时会同时导入两路波形。默认采样率为 500 Hz，请按文件的实际采样率填写。</p>
     </details>
     <div className={`dropzone${dragging ? ' dragging' : ''}`}
          onDragOver={event => {event.preventDefault(); setDragging(true);}}
